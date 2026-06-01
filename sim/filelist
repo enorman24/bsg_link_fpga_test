@@ -1,0 +1,90 @@
+# Include paths
++incdir+/data2/enorman/basejump_stl/bsg_misc
++incdir+../rtl/axi_crossbar/axi/include
++incdir+../rtl/axi_crossbar/common_cells/common_cells/include
+
+# ---- BSG defines (must come first) ----
+/data2/enorman/basejump_stl/bsg_misc/bsg_defines.sv
+
+# ---- BSG async ----
+/data2/enorman/basejump_stl/bsg_async/bsg_async_ptr_gray.sv
+/data2/enorman/basejump_stl/bsg_async/bsg_launch_sync_sync.sv
+/data2/enorman/basejump_stl/bsg_async/bsg_async_credit_counter.sv
+/data2/enorman/basejump_stl/bsg_async/bsg_async_fifo.sv
+
+# ---- BSG misc ----
+/data2/enorman/basejump_stl/bsg_misc/bsg_array_reverse.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_circular_ptr.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_counter_clear_up.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_and.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_mux.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_gray_to_binary.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_binary_plus_one_to_gray.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_scan.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_dff_reset.sv
+/data2/enorman/basejump_stl/bsg_misc/bsg_dff_en.sv
+
+# ---- BSG mem ----
+/data2/enorman/basejump_stl/bsg_mem/bsg_mem_1r1w_synth.sv
+/data2/enorman/basejump_stl/bsg_mem/bsg_mem_1r1w.sv
+/data2/enorman/basejump_stl/bsg_mem/bsg_mem_1r1w_sync_synth.sv
+/data2/enorman/basejump_stl/bsg_mem/bsg_mem_1r1w_sync.sv
+
+# ---- BSG dataflow ----
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_fifo_tracker.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_fifo_1r1w_small_unhardened.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_fifo_1r1w_small_hardened.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_fifo_1r1w_small.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_one_fifo.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_two_fifo.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_parallel_in_serial_out.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_serial_in_parallel_out_full.sv
+/data2/enorman/basejump_stl/bsg_dataflow/bsg_round_robin_1_to_n.sv
+
+# ---- BSG link ----
+/data2/enorman/basejump_stl/bsg_link/bsg_link_oddr_phy.sv
+/data2/enorman/basejump_stl/bsg_link/bsg_link_iddr_phy.sv
+/data2/enorman/basejump_stl/bsg_link/bsg_link_source_sync_upstream.sv
+/data2/enorman/basejump_stl/bsg_link/bsg_link_source_sync_downstream.sv
+/data2/enorman/basejump_stl/bsg_link/bsg_link_ddr_upstream.sv
+/data2/enorman/basejump_stl/bsg_link/bsg_link_ddr_downstream.sv
+
+# ---- AXI crossbar — common_cells ----
+../rtl/axi_crossbar/common_cells/common_cells/src/cf_math_pkg.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/addr_decode.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/addr_decode_dync.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/lzc.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/onehot_to_bin.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/rr_arb_tree.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/counter.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/delta_counter.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/fifo_v3.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/fall_through_register.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/spill_register_flushable.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/spill_register.sv
+../rtl/axi_crossbar/common_cells/common_cells/src/id_queue.sv
+
+# ---- AXI crossbar — axi library ----
+../rtl/axi_crossbar/axi/src/axi_pkg.sv
+../rtl/axi_crossbar/axi/src/rand_id_queue_pkg.sv
+../rtl/axi_crossbar/axi/src/axi_err_slv.sv
+../rtl/axi_crossbar/axi/src/axi_cut.sv
+../rtl/axi_crossbar/axi/src/axi_multicut.sv
+../rtl/axi_crossbar/axi/src/axi_id_prepend.sv
+../rtl/axi_crossbar/axi/src/axi_demux_id_counters.sv
+../rtl/axi_crossbar/axi/src/axi_demux_simple.sv
+../rtl/axi_crossbar/axi/src/axi_demux.sv
+../rtl/axi_crossbar/axi/src/axi_mux.sv
+../rtl/axi_crossbar/axi/src/axi_xbar_unmuxed.sv
+../rtl/axi_crossbar/axi/src/axi_xbar.sv
+
+# ---- Custom RTL ----
+../rtl/bsg_link_xbar_pkg.sv
+../rtl/bsg_link_xbar.sv
+../rtl/bsg_link_axi_tx_fifo.sv
+../rtl/bsg_link_axi_rx_fifo.sv
+../rtl/bsg_link_axi_rx_status.sv
+../rtl/bsg_link_test_top.sv
+
+# ---- Testbench ----
+./bsg_link_test_tb.sv

@@ -1,0 +1,43 @@
+#-----------------------------------------------------------
+# Vivado v2025.1 (64-bit)
+# SW Build 6140274 on Wed May 21 22:58:25 MDT 2025
+# IP Build 6138677 on Thu May 22 03:10:11 MDT 2025
+# SharedData Build 6139179 on Tue May 20 17:58:58 MDT 2025
+# Start of session at: Mon Jun  1 15:06:01 2026
+# Process ID         : 1521222
+# Current directory  : /data2/enorman/bsg_link_vivado/sim
+# Command line       : vivado
+# Log file           : /data2/enorman/bsg_link_vivado/sim/vivado.log
+# Journal file       : /data2/enorman/bsg_link_vivado/sim/vivado.jou
+# Running On         : squire.ece.uw.edu
+# Platform           : AlmaLinux
+# Operating System   : AlmaLinux release 8.10 (Cerulean Leopard)
+# Processor Detail   : AMD EPYC 9374F 32-Core Processor
+# CPU Frequency      : 4297.919 MHz
+# CPU Physical cores : 64
+# CPU Logical cores  : 128
+# Host memory        : 810606 MB
+# Swap memory        : 206997 MB
+# Total Virtual      : 1017603 MB
+# Available Virtual  : 941252 MB
+#-----------------------------------------------------------
+start_gui
+open_project /data2/enorman/bsg_link_vivado/build/bsg_link_vivado/bsg_link_vivado.xpr
+update_compile_order -fileset sources_1
+reset_run synth_1
+launch_runs synth_1 -jobs 30
+wait_on_run synth_1
+launch_runs impl_1 -jobs 30
+wait_on_run impl_1
+reset_run synth_1
+launch_runs synth_1 -jobs 30
+wait_on_run synth_1
+launch_runs impl_1 -jobs 30
+wait_on_run impl_1
+reset_run synth_1
+launch_runs impl_1 -jobs 30
+wait_on_run impl_1
+reset_run synth_1
+launch_runs impl_1 -jobs 30
+wait_on_run impl_1
+open_run impl_1

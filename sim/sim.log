@@ -1,0 +1,35 @@
+Info: [VCS_SAVE_RESTORE_INFO] ASLR (Address Space Layout Randomization) is detected on the machine. To enable $save functionality, ASLR will be switched off and simv re-executed.
+Please use '-no_save' simv switch to avoid re-execution or '-suppress=ASLR_DETECTED_INFO' to suppress this message.
+Chronologic VCS simulator copyright 1991-2025
+Contains Synopsys proprietary information.
+Compiler version X-2025.06_Full64; Runtime version X-2025.06_Full64;  Jun  1 15:55 2026
+## bsg_mem_1r1w: instantiating width_p=         34, els_p=         16, read_write_same_addr_p=          0, harden_p=          0 (bsg_link_test_tb.dut.link_rx_i.ch[0].downstream.baf.MSYNC_1r1w)
+*Verdi* Loading libsscore_vcs202506.so
+FSDB Dumper for VCS, Release Verdi_X-2025.06, Linux x86_64/64bit, 05/31/2025
+(C) 1996 - 2025 by Synopsys, Inc.
+*Verdi* FSDB WARNING: The FSDB file already exists. Overwriting the FSDB file may crash the programs that are using this file.
+*Verdi* : Create FSDB file 'waveform.fsdb'
+*Verdi* : Begin traversing the scope (bsg_link_test_tb), layer (0).
+*Verdi* : Enable +struct and +mda dumping.
+*Verdi* : End of traversing.
+=== bsg_link_test_tb start ===
+## bsg_mem_1r1w: instantiating width_p=         34, els_p=          8, read_write_same_addr_p=          0, harden_p=          0 (bsg_link_test_tb.dut.link_tx_i.ch[0].sso.async_fifo.MSYNC_1r1w)
+[round-A] writing 8 words...
+[round-A] waiting for loopback...
+[round-A] RX count = 8
+[round-A] reading back...
+[round-A] PASS — all 8 words match.
+
+[round-B] writing 8 words...
+[round-B] waiting for loopback...
+[round-B] RX count = 8
+[round-B] reading back...
+[round-B] PASS — all 8 words match.
+
+=== all rounds passed ===
+$finish called from file "./bsg_link_test_tb.sv", line 294.
+$finish at simulation time                 1697
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 1697 ps
+CPU Time:      0.160 seconds;       Data structure size:   0.1Mb
+Mon Jun  1 15:55:06 2026

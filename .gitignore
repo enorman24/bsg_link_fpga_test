@@ -1,0 +1,16 @@
+/build/
+/.Xil/
+/bsg_link_vivado.cache/
+/bsg_link_vivado.gen/
+/bsg_link_vivado.hw/
+/bsg_link_vivado.ip_user_files/
+/bsg_link_vivado.runs/
+/bsg_link_vivado.sim/
+/bsg_link_vivado.srcs/
+/bsg_link_vivado.xpr
+/bsg_link_vivado.xpr.bak
+/vivado*.jou
+/vivado*.log
+/vivado*.str
+/constraints/reports/
+
