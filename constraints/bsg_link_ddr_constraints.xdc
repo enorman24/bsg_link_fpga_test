@@ -7,9 +7,8 @@
 # The sample lines are kept commented where they do not directly map to this
 # ZCU102/generic-PHY design. Active translated lines sit immediately below.
 #
-# NOTE: bsg_link_test_zcu102.xdc currently still contains duplicate DDR timing
-# constraints. Remove/comment that timing section before this file becomes the
-# only active BSG Link DDR timing source.
+# Active timing structure and margins below come from the official BSG Link
+# sample XDC where they map to this design.
 #==============================================================================
 
 # User should re-define periods / names / ports / pins / margins

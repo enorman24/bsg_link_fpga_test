@@ -42,4 +42,6 @@ sim/vivado*.jou
 sim/vivado*.log
 sim/vivado*.str
 sim/sim.log
+sim/xsim_*.backup.jou
+sim/xsim_*.backup.log
 

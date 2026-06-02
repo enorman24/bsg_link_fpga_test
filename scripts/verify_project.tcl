@@ -30,12 +30,14 @@ foreach f [concat $source_files $sim_files $xdc_files] {
 
 set required [list \
   "$REPO_ROOT/rtl/bsg_link_test_top.sv" \
-  "$REPO_ROOT/rtl/bsg_link_xbar.sv" \
+  "$REPO_ROOT/rtl/bsg_link_xbar_pkg.sv" \
   "$REPO_ROOT/rtl/bsg_link_axi_tx_fifo.sv" \
   "$REPO_ROOT/rtl/bsg_link_axi_rx_fifo.sv" \
   "$REPO_ROOT/rtl/bsg_link_axi_rx_status.sv" \
   "$REPO_ROOT/sim/bsg_link_test_tb.sv" \
-  "$REPO_ROOT/constraints/bsg_link_test_zcu102.xdc" \
+  "$REPO_ROOT/constraints/system_constraints.xdc" \
+  "$REPO_ROOT/constraints/placement_constraints.xdc" \
+  "$REPO_ROOT/constraints/bsg_link_ddr_constraints.xdc" \
 ]
 
 set missing [list]
@@ -45,9 +47,18 @@ foreach f $required {
   }
 }
 
+set required_ips [list jtag_axi_0 axi_crossbar]
+set missing_ips [list]
+foreach ip $required_ips {
+  if {[llength [get_ips -quiet $ip]] == 0} {
+    lappend missing_ips $ip
+  }
+}
+
 puts "verify_project.tcl: sources_1 file count: [llength $source_files]"
 puts "verify_project.tcl: sim_1 file count: [llength $sim_files]"
 puts "verify_project.tcl: constrs_1 XDC count: [llength $xdc_files]"
+puts "verify_project.tcl: IP count: [llength [get_ips -quiet]]"
 
 if {[llength $stale] > 0} {
   error "Generated project contains stale bsg_link_test source references:\n  [join $stale "\n  "]"
@@ -55,10 +66,12 @@ if {[llength $stale] > 0} {
 if {[llength $missing] > 0} {
   error "Generated project is missing required file(s):\n  [join $missing "\n  "]"
 }
+if {[llength $missing_ips] > 0} {
+  error "Generated project is missing required IP(s):\n  [join $missing_ips "\n  "]"
+}
 if {[llength $xdc_files] == 0} {
   error "Generated project has no XDC constraints in constrs_1"
 }
 
 puts "verify_project.tcl: project source, sim, and constraint references are valid"
 close_project
-

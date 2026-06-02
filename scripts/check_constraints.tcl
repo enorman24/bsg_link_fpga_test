@@ -1,5 +1,6 @@
 # check_constraints.tcl
-# Verifies the bsg_link_test XDC against the latest synthesized checkpoint.
+# Verifies the split BSG Link XDC files against the latest synthesized
+# checkpoint.
 #
 # Usage:
 #   vivado -mode batch -source scripts/check_constraints.tcl
@@ -10,7 +11,11 @@ set PROJ_NAME  "bsg_link_vivado"
 set PROJ_DIR   [file normalize "$REPO_ROOT/build/$PROJ_NAME"]
 
 set dcp_file   [file normalize "$PROJ_DIR/bsg_link_vivado.runs/synth_1/bsg_link_test_top.dcp"]
-set xdc_file   [file normalize "$REPO_ROOT/constraints/bsg_link_test_zcu102.xdc"]
+set xdc_files  [list \
+  [file normalize "$REPO_ROOT/constraints/system_constraints.xdc"] \
+  [file normalize "$REPO_ROOT/constraints/placement_constraints.xdc"] \
+  [file normalize "$REPO_ROOT/constraints/bsg_link_ddr_constraints.xdc"] \
+]
 set report_dir [file normalize "$PROJ_DIR/reports/constraints"]
 
 if {![file exists $dcp_file]} {
@@ -20,10 +25,15 @@ if {![file exists $dcp_file]} {
 file mkdir $report_dir
 
 open_checkpoint $dcp_file
-read_xdc $xdc_file
+foreach f $xdc_files {
+  if {![file exists $f]} {
+    error "Missing required constraint file: $f"
+  }
+  read_xdc $f
+}
 
-report_clocks -file "$report_dir/bsg_link_test_clocks.rpt"
-report_drc -file "$report_dir/bsg_link_test_drc_after_xdc.rpt"
-report_timing_summary -file "$report_dir/bsg_link_test_timing_summary.rpt"
+report_clocks -file "$report_dir/split_constraints_clocks.rpt"
+report_drc -file "$report_dir/split_constraints_drc.rpt"
+report_timing_summary -file "$report_dir/split_constraints_timing_summary.rpt"
 
 close_design

@@ -8,9 +8,7 @@
 # to this ZCU102 design are commented out, with translated lines nearby when the
 # intent still applies.
 #
-# This file is intended to be the active BSG Link physical-interface constraint
-# file. bsg_link_test_zcu102.xdc should only be used as a port/pin translation
-# reference while it is being retired.
+# This file is the active BSG Link physical-interface constraint file.
 #==============================================================================
 
 # This is an example for placing only one pin / one bank
@@ -29,7 +27,7 @@ set_property INTERNAL_VREF 0.900 [get_iobanks {66 67}]
 # The 240 ohm resistor can be cascaded to other banks if needed
 #
 # Sample:
-# set_property DCI_CASCADE {64} [get_iobanks 65]
+set_property DCI_CASCADE {64} [get_iobanks 65]
 #
 # This design has not verified a ZCU102 DCI cascade requirement yet. Leave the
 # sample constraint commented until the bank/reference-resistor plan is known.

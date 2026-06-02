@@ -11,8 +11,7 @@
 // CONSTRAINT: FLIT_WIDTH_P must equal bsg_link_xbar_pkg::AxiDataWidth (32).
 //
 // Vivado project setup:
-//   - Run scripts/create_project.tcl to generate the jtag_axi_0 IP.
-//   - The axi_crossbar IP must be present in the Vivado project (already generated).
+//   - Run scripts/create_project.tcl to generate the jtag_axi_0 and axi_crossbar IP.
 //
 // Simulation:
 //   Compile with +define+SIM.  The `ifdef SIM block replaces jtag_axi_0 with
