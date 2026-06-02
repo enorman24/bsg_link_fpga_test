@@ -137,7 +137,7 @@ module bsg_link_axi_rx_fifo
     axi_resp_o.r_valid  = (r_state_r == R_BURST) && !empty_w;
     axi_resp_o.r.id     = ar_id_r;
     axi_resp_o.r.data   = mem[rd_ptr_r[LG_FIFO_DEPTH_P-1:0]];
-    axi_resp_o.r.resp   = axi_pkg::RESP_OKAY;
+    axi_resp_o.r.resp   = RESP_OKAY;
     axi_resp_o.r.last   = (r_beats_rem_r == '0);
     // AW: accept when write SM idle
     axi_resp_o.aw_ready = (w_state_r == W_IDLE);
@@ -147,7 +147,7 @@ module bsg_link_axi_rx_fifo
     // B: DECERR after all write data has been accepted
     axi_resp_o.b_valid  = (w_state_r == W_RESP);
     axi_resp_o.b.id     = aw_id_r;
-    axi_resp_o.b.resp   = axi_pkg::RESP_DECERR;
+    axi_resp_o.b.resp   = RESP_DECERR;
   end
 
 endmodule : bsg_link_axi_rx_fifo

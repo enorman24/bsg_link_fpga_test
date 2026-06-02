@@ -1,15 +1,13 @@
-// AXI4 types and crossbar configuration for the BSG link FPGA test.
-// Topology: 1 slave port (JTAG AXI master), 3 master ports (TX FIFO, RX FIFO, RX Status).
-// Bus widths: 32-bit address, 32-bit data, 4-bit ID, 1-bit user.
-// To change widths, edit the localparams and re-elaborate.
-
-`ifndef AXI_TYPEDEF_SVH_
-`include "axi/typedef.svh"
-`endif
+// AXI4 types for the BSG link FPGA test.
+// Topology: 1 slave port (JTAG AXI master → S00), 3 master ports
+//           (TX FIFO → M00, RX FIFO → M01, RX Status → M02).
+// Bus widths: 32-bit address, 32-bit data, 1-bit ID, 1-bit user.
+//
+// Struct field order matches the PULP AXI4+ATOP typedef macros (typedef.svh)
+// so that existing field-access expressions in bsg_link_test_top.sv and the
+// three slave modules compile unchanged.
 
 package bsg_link_xbar_pkg;
-
-  import axi_pkg::*;
 
   // ---- Bus parameters ----
   localparam int unsigned AxiAddrWidth = 32;
@@ -18,22 +16,21 @@ package bsg_link_xbar_pkg;
   localparam int unsigned AxiUserWidth = 1;
 
   // ---- Crossbar topology ----
-  localparam int unsigned NoSlvPorts  = 1;   // one JTAG master
-  localparam int unsigned NoMstPorts  = 3;   // TX FIFO, RX FIFO, RX Status
-  localparam int unsigned NoAddrRules = 3;
+  localparam int unsigned NoSlvPorts = 1;   // one JTAG master  → S00
+  localparam int unsigned NoMstPorts = 3;   // TX FIFO, RX FIFO, RX Status
 
   // ---- ID widths ----
-  // jtag_axi_0 generates 1-bit IDs (M_AXI_ID_WIDTH=1 in the generated IP).
-  // With NoSlvPorts=1, $clog2(1)=0, so MstIdWidth equals SlvIdWidth.
+  // jtag_axi_0 generates 1-bit IDs.  With a single slave port the crossbar
+  // prepends 0 bits, so master-port ID width equals slave-port ID width.
   localparam int unsigned SlvIdWidth = 1;
-  localparam int unsigned MstIdWidth = SlvIdWidth + $clog2(NoSlvPorts == 1 ? 1 : NoSlvPorts);
+  localparam int unsigned MstIdWidth = 1;
 
   // ---- Master-port indices ----
   localparam int unsigned IDX_TX_FIFO = 0;
   localparam int unsigned IDX_RX_FIFO = 1;
   localparam int unsigned IDX_RX_STA  = 2;
 
-  // ---- Address map ----
+  // ---- Address map (end_addr is exclusive, matching addr_decode convention) ----
   localparam logic [AxiAddrWidth-1:0] TX_BASE  = 32'h4000_0000;
   localparam logic [AxiAddrWidth-1:0] TX_END   = 32'h4001_0000;
   localparam logic [AxiAddrWidth-1:0] RX_BASE  = 32'h4001_0000;
@@ -41,22 +38,11 @@ package bsg_link_xbar_pkg;
   localparam logic [AxiAddrWidth-1:0] STA_BASE = 32'h4002_0000;
   localparam logic [AxiAddrWidth-1:0] STA_END  = 32'h4003_0000;
 
-  // ---- Crossbar configuration ----
-  localparam axi_pkg::xbar_cfg_t XbarCfg = '{
-      NoSlvPorts:         NoSlvPorts,
-      NoMstPorts:         NoMstPorts,
-      MaxMstTrans:        4,
-      MaxSlvTrans:        4,
-      FallThrough:        1'b0,
-      LatencyMode:        axi_pkg::NO_LATENCY,
-      PipelineStages:     0,
-      AxiIdWidthSlvPorts: SlvIdWidth,
-      AxiIdUsedSlvPorts:  SlvIdWidth,
-      UniqueIds:          1'b0,
-      AxiAddrWidth:       AxiAddrWidth,
-      AxiDataWidth:       AxiDataWidth,
-      NoAddrRules:        NoAddrRules
-  };
+  // ---- AXI response codes ----
+  localparam logic [1:0] RESP_OKAY   = 2'b00;
+  localparam logic [1:0] RESP_EXOKAY = 2'b01;
+  localparam logic [1:0] RESP_SLVERR = 2'b10;
+  localparam logic [1:0] RESP_DECERR = 2'b11;
 
   // ---- Scalar types ----
   typedef logic [AxiAddrWidth-1:0] axi_addr_t;
@@ -66,28 +52,148 @@ package bsg_link_xbar_pkg;
   typedef logic [SlvIdWidth-1:0]   slv_id_t;
   typedef logic [MstIdWidth-1:0]   mst_id_t;
 
-  // 32-bit address rule for addr_decode
+  // =========================================================================
+  // AXI4 channel structs — explicit definitions replacing AXI_TYPEDEF_* macros.
+  // =========================================================================
+
+  // W channel (shared between slave-port and master-port request types)
   typedef struct packed {
-    int unsigned             idx;
-    logic [AxiAddrWidth-1:0] start_addr;
-    logic [AxiAddrWidth-1:0] end_addr;
-  } xbar_rule_32_t;
+    axi_data_t data;
+    axi_strb_t strb;
+    logic      last;
+    axi_user_t user;
+  } w_t;
 
-  // ---- Slave-port AXI types (JTAG master → xbar, SlvIdWidth IDs) ----
-  `AXI_TYPEDEF_AW_CHAN_T(slv_aw_t, axi_addr_t, slv_id_t, axi_user_t)
-  `AXI_TYPEDEF_W_CHAN_T(w_t, axi_data_t, axi_strb_t, axi_user_t)
-  `AXI_TYPEDEF_B_CHAN_T(slv_b_t, slv_id_t, axi_user_t)
-  `AXI_TYPEDEF_AR_CHAN_T(slv_ar_t, axi_addr_t, slv_id_t, axi_user_t)
-  `AXI_TYPEDEF_R_CHAN_T(slv_r_t, axi_data_t, slv_id_t, axi_user_t)
-  `AXI_TYPEDEF_REQ_T(slv_req_t, slv_aw_t, w_t, slv_ar_t)
-  `AXI_TYPEDEF_RESP_T(slv_resp_t, slv_b_t, slv_r_t)
+  // ---- Slave-port types (S00 / JTAG side, SlvIdWidth IDs) ----
 
-  // ---- Master-port AXI types (xbar → slaves, MstIdWidth IDs) ----
-  `AXI_TYPEDEF_AW_CHAN_T(mst_aw_t, axi_addr_t, mst_id_t, axi_user_t)
-  `AXI_TYPEDEF_B_CHAN_T(mst_b_t, mst_id_t, axi_user_t)
-  `AXI_TYPEDEF_AR_CHAN_T(mst_ar_t, axi_addr_t, mst_id_t, axi_user_t)
-  `AXI_TYPEDEF_R_CHAN_T(mst_r_t, axi_data_t, mst_id_t, axi_user_t)
-  `AXI_TYPEDEF_REQ_T(mst_req_t, mst_aw_t, w_t, mst_ar_t)
-  `AXI_TYPEDEF_RESP_T(mst_resp_t, mst_b_t, mst_r_t)
+  typedef struct packed {
+    slv_id_t   id;
+    axi_addr_t addr;
+    logic [7:0] len;
+    logic [2:0] size;
+    logic [1:0] burst;
+    logic       lock;
+    logic [3:0] cache;
+    logic [2:0] prot;
+    logic [3:0] qos;
+    logic [3:0] region;
+    logic [5:0] atop;   // AXI4+ATOP field; tied to '0 from JTAG
+    axi_user_t  user;
+  } slv_aw_t;
+
+  typedef struct packed {
+    slv_id_t    id;
+    logic [1:0] resp;
+    axi_user_t  user;
+  } slv_b_t;
+
+  typedef struct packed {
+    slv_id_t   id;
+    axi_addr_t addr;
+    logic [7:0] len;
+    logic [2:0] size;
+    logic [1:0] burst;
+    logic       lock;
+    logic [3:0] cache;
+    logic [2:0] prot;
+    logic [3:0] qos;
+    logic [3:0] region;
+    axi_user_t  user;
+  } slv_ar_t;
+
+  typedef struct packed {
+    slv_id_t    id;
+    axi_data_t  data;
+    logic [1:0] resp;
+    logic       last;
+    axi_user_t  user;
+  } slv_r_t;
+
+  typedef struct packed {
+    slv_aw_t aw;
+    logic    aw_valid;
+    w_t      w;
+    logic    w_valid;
+    logic    b_ready;
+    slv_ar_t ar;
+    logic    ar_valid;
+    logic    r_ready;
+  } slv_req_t;
+
+  typedef struct packed {
+    logic    aw_ready;
+    logic    ar_ready;
+    logic    w_ready;
+    logic    b_valid;
+    slv_b_t  b;
+    logic    r_valid;
+    slv_r_t  r;
+  } slv_resp_t;
+
+  // ---- Master-port types (M00/M01/M02, MstIdWidth IDs) ----
+
+  typedef struct packed {
+    mst_id_t   id;
+    axi_addr_t addr;
+    logic [7:0] len;
+    logic [2:0] size;
+    logic [1:0] burst;
+    logic       lock;
+    logic [3:0] cache;
+    logic [2:0] prot;
+    logic [3:0] qos;
+    logic [3:0] region;
+    logic [5:0] atop;
+    axi_user_t  user;
+  } mst_aw_t;
+
+  typedef struct packed {
+    mst_id_t    id;
+    logic [1:0] resp;
+    axi_user_t  user;
+  } mst_b_t;
+
+  typedef struct packed {
+    mst_id_t   id;
+    axi_addr_t addr;
+    logic [7:0] len;
+    logic [2:0] size;
+    logic [1:0] burst;
+    logic       lock;
+    logic [3:0] cache;
+    logic [2:0] prot;
+    logic [3:0] qos;
+    logic [3:0] region;
+    axi_user_t  user;
+  } mst_ar_t;
+
+  typedef struct packed {
+    mst_id_t    id;
+    axi_data_t  data;
+    logic [1:0] resp;
+    logic       last;
+    axi_user_t  user;
+  } mst_r_t;
+
+  typedef struct packed {
+    mst_aw_t aw;
+    logic    aw_valid;
+    w_t      w;
+    logic    w_valid;
+    logic    b_ready;
+    mst_ar_t ar;
+    logic    ar_valid;
+    logic    r_ready;
+  } mst_req_t;
+
+  typedef struct packed {
+    logic    aw_ready;
+    logic    ar_ready;
+    logic    w_ready;
+    logic    b_valid;
+    mst_b_t  b;
+    logic    r_valid;
+    mst_r_t  r;
+  } mst_resp_t;
 
 endpackage : bsg_link_xbar_pkg

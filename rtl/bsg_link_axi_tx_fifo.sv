@@ -136,12 +136,12 @@ module bsg_link_axi_tx_fifo
     // B: respond after burst completes
     axi_resp_o.b_valid  = (state_r == RESP);
     axi_resp_o.b.id     = aw_id_r;
-    axi_resp_o.b.resp   = axi_pkg::RESP_OKAY;
+    axi_resp_o.b.resp   = RESP_OKAY;
     // AR: accept when read SM idle; return DECERR on all R beats
     axi_resp_o.ar_ready = (r_state_r == R_IDLE);
     axi_resp_o.r_valid  = (r_state_r == R_BURST);
     axi_resp_o.r.id     = ar_id_r;
-    axi_resp_o.r.resp   = axi_pkg::RESP_DECERR;
+    axi_resp_o.r.resp   = RESP_DECERR;
     axi_resp_o.r.last   = (r_beats_rem_r == '0);
     axi_resp_o.r.data   = '0;
   end

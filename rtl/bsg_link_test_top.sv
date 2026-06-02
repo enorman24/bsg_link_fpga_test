@@ -12,16 +12,11 @@
 //
 // Vivado project setup:
 //   - Run scripts/create_project.tcl to generate the jtag_axi_0 IP.
-//   - Add axi_crossbar/axi/include to the include search path.
-//   - Add axi_crossbar/common_cells/include to the include search path.
+//   - The axi_crossbar IP must be present in the Vivado project (already generated).
 //
 // Simulation:
 //   Compile with +define+SIM.  The `ifdef SIM block replaces jtag_axi_0 with
 //   direct AXI ports (sim_req_i / sim_resp_o) driven by the testbench.
-
-`ifndef AXI_TYPEDEF_SVH_
-`include "axi/typedef.svh"
-`endif
 
 module bsg_link_test_top
   import bsg_link_xbar_pkg::*;
@@ -268,23 +263,437 @@ module bsg_link_test_top
 `endif
 
   // =========================================================================
-  // AXI crossbar: 1 slave port (JTAG), 3 master ports (TX FIFO, RX FIFO,
-  // RX Status).  Address map is defined in bsg_link_xbar_pkg.
+  // AXI crossbar: 1 slave port (JTAG → S00), 3 master ports
+  // (TX FIFO → M00, RX FIFO → M01, RX Status → M02).
+  // Vivado AXI Switch IP (axi_crossbar); address map configured at IP-gen time.
   // =========================================================================
   mst_req_t  tx_axi_req_w,  rx_axi_req_w,  sta_axi_req_w;
   mst_resp_t tx_axi_resp_w, rx_axi_resp_w, sta_axi_resp_w;
 
-  bsg_link_xbar i_xbar (
-    .clk_i      (core_clk_i),
-    .rst_i      (rst_i),
-    .jtag_req_i (jtag_req_w),
-    .jtag_resp_o(jtag_resp_w),
-    .tx_req_o   (tx_axi_req_w),
-    .tx_resp_i  (tx_axi_resp_w),
-    .rx_req_o   (rx_axi_req_w),
-    .rx_resp_i  (rx_axi_resp_w),
-    .sta_req_o  (sta_axi_req_w),
-    .sta_resp_i (sta_axi_resp_w)
+  // ---- S00 output wires (crossbar → jtag_resp_w) ----
+  logic        xbar_s00_aw_ready_w;
+  logic        xbar_s00_w_ready_w;
+  logic        xbar_s00_b_valid_w;
+  logic [0:0]  xbar_s00_b_id_w;
+  logic [1:0]  xbar_s00_b_resp_w;
+  logic [0:0]  xbar_s00_b_user_w;
+  logic        xbar_s00_ar_ready_w;
+  logic        xbar_s00_r_valid_w;
+  logic [0:0]  xbar_s00_r_id_w;
+  logic [31:0] xbar_s00_r_data_w;
+  logic [1:0]  xbar_s00_r_resp_w;
+  logic        xbar_s00_r_last_w;
+  logic [0:0]  xbar_s00_r_user_w;
+
+  always_comb begin : pack_s00_resp
+    jtag_resp_w          = '0;
+    jtag_resp_w.aw_ready = xbar_s00_aw_ready_w;
+    jtag_resp_w.w_ready  = xbar_s00_w_ready_w;
+    jtag_resp_w.b_valid  = xbar_s00_b_valid_w;
+    jtag_resp_w.b.id     = xbar_s00_b_id_w;
+    jtag_resp_w.b.resp   = xbar_s00_b_resp_w;
+    jtag_resp_w.b.user   = xbar_s00_b_user_w;
+    jtag_resp_w.ar_ready = xbar_s00_ar_ready_w;
+    jtag_resp_w.r_valid  = xbar_s00_r_valid_w;
+    jtag_resp_w.r.id     = xbar_s00_r_id_w;
+    jtag_resp_w.r.data   = xbar_s00_r_data_w;
+    jtag_resp_w.r.resp   = xbar_s00_r_resp_w;
+    jtag_resp_w.r.last   = xbar_s00_r_last_w;
+    jtag_resp_w.r.user   = xbar_s00_r_user_w;
+  end
+
+  // ---- M00 wires: TX FIFO (0x4000_0000 – 0x4000_FFFF) ----
+  logic        xbar_m00_aw_valid_w;  logic [0:0]  xbar_m00_aw_id_w;
+  logic [31:0] xbar_m00_aw_addr_w;  logic [7:0]  xbar_m00_aw_len_w;
+  logic [2:0]  xbar_m00_aw_size_w;  logic [1:0]  xbar_m00_aw_burst_w;
+  logic [0:0]  xbar_m00_aw_lock_w;  logic [3:0]  xbar_m00_aw_cache_w;
+  logic [2:0]  xbar_m00_aw_prot_w;  logic [3:0]  xbar_m00_aw_qos_w;
+  logic [0:0]  xbar_m00_aw_user_w;
+  logic        xbar_m00_w_valid_w;   logic [31:0] xbar_m00_w_data_w;
+  logic [3:0]  xbar_m00_w_strb_w;   logic        xbar_m00_w_last_w;
+  logic [0:0]  xbar_m00_w_user_w;   logic        xbar_m00_b_ready_w;
+  logic        xbar_m00_ar_valid_w;  logic [0:0]  xbar_m00_ar_id_w;
+  logic [31:0] xbar_m00_ar_addr_w;  logic [7:0]  xbar_m00_ar_len_w;
+  logic [2:0]  xbar_m00_ar_size_w;  logic [1:0]  xbar_m00_ar_burst_w;
+  logic [0:0]  xbar_m00_ar_lock_w;  logic [3:0]  xbar_m00_ar_cache_w;
+  logic [2:0]  xbar_m00_ar_prot_w;  logic [3:0]  xbar_m00_ar_qos_w;
+  logic [0:0]  xbar_m00_ar_user_w;  logic        xbar_m00_r_ready_w;
+  logic        xbar_m00_aw_ready_w;  logic        xbar_m00_w_ready_w;
+  logic        xbar_m00_b_valid_w;   logic [0:0]  xbar_m00_b_id_w;
+  logic [1:0]  xbar_m00_b_resp_w;   logic [0:0]  xbar_m00_b_user_w;
+  logic        xbar_m00_ar_ready_w;  logic        xbar_m00_r_valid_w;
+  logic [0:0]  xbar_m00_r_id_w;     logic [31:0] xbar_m00_r_data_w;
+  logic [1:0]  xbar_m00_r_resp_w;   logic        xbar_m00_r_last_w;
+  logic [0:0]  xbar_m00_r_user_w;
+
+  always_comb begin : pack_m00_req
+    tx_axi_req_w          = '0;
+    tx_axi_req_w.aw_valid = xbar_m00_aw_valid_w;
+    tx_axi_req_w.aw.id    = xbar_m00_aw_id_w;
+    tx_axi_req_w.aw.addr  = xbar_m00_aw_addr_w;
+    tx_axi_req_w.aw.len   = xbar_m00_aw_len_w;
+    tx_axi_req_w.aw.size  = xbar_m00_aw_size_w;
+    tx_axi_req_w.aw.burst = xbar_m00_aw_burst_w;
+    tx_axi_req_w.aw.lock  = xbar_m00_aw_lock_w;
+    tx_axi_req_w.aw.cache = xbar_m00_aw_cache_w;
+    tx_axi_req_w.aw.prot  = xbar_m00_aw_prot_w;
+    tx_axi_req_w.aw.qos   = xbar_m00_aw_qos_w;
+    tx_axi_req_w.aw.user  = xbar_m00_aw_user_w;
+    tx_axi_req_w.w_valid  = xbar_m00_w_valid_w;
+    tx_axi_req_w.w.data   = xbar_m00_w_data_w;
+    tx_axi_req_w.w.strb   = xbar_m00_w_strb_w;
+    tx_axi_req_w.w.last   = xbar_m00_w_last_w;
+    tx_axi_req_w.w.user   = xbar_m00_w_user_w;
+    tx_axi_req_w.b_ready  = xbar_m00_b_ready_w;
+    tx_axi_req_w.ar_valid = xbar_m00_ar_valid_w;
+    tx_axi_req_w.ar.id    = xbar_m00_ar_id_w;
+    tx_axi_req_w.ar.addr  = xbar_m00_ar_addr_w;
+    tx_axi_req_w.ar.len   = xbar_m00_ar_len_w;
+    tx_axi_req_w.ar.size  = xbar_m00_ar_size_w;
+    tx_axi_req_w.ar.burst = xbar_m00_ar_burst_w;
+    tx_axi_req_w.ar.lock  = xbar_m00_ar_lock_w;
+    tx_axi_req_w.ar.cache = xbar_m00_ar_cache_w;
+    tx_axi_req_w.ar.prot  = xbar_m00_ar_prot_w;
+    tx_axi_req_w.ar.qos   = xbar_m00_ar_qos_w;
+    tx_axi_req_w.ar.user  = xbar_m00_ar_user_w;
+    tx_axi_req_w.r_ready  = xbar_m00_r_ready_w;
+  end
+
+  assign xbar_m00_aw_ready_w = tx_axi_resp_w.aw_ready;
+  assign xbar_m00_w_ready_w  = tx_axi_resp_w.w_ready;
+  assign xbar_m00_b_valid_w  = tx_axi_resp_w.b_valid;
+  assign xbar_m00_b_id_w     = tx_axi_resp_w.b.id;
+  assign xbar_m00_b_resp_w   = tx_axi_resp_w.b.resp;
+  assign xbar_m00_b_user_w   = tx_axi_resp_w.b.user;
+  assign xbar_m00_ar_ready_w = tx_axi_resp_w.ar_ready;
+  assign xbar_m00_r_valid_w  = tx_axi_resp_w.r_valid;
+  assign xbar_m00_r_id_w     = tx_axi_resp_w.r.id;
+  assign xbar_m00_r_data_w   = tx_axi_resp_w.r.data;
+  assign xbar_m00_r_resp_w   = tx_axi_resp_w.r.resp;
+  assign xbar_m00_r_last_w   = tx_axi_resp_w.r.last;
+  assign xbar_m00_r_user_w   = tx_axi_resp_w.r.user;
+
+  // ---- M01 wires: RX FIFO (0x4001_0000 – 0x4001_FFFF) ----
+  logic        xbar_m01_aw_valid_w;  logic [0:0]  xbar_m01_aw_id_w;
+  logic [31:0] xbar_m01_aw_addr_w;  logic [7:0]  xbar_m01_aw_len_w;
+  logic [2:0]  xbar_m01_aw_size_w;  logic [1:0]  xbar_m01_aw_burst_w;
+  logic [0:0]  xbar_m01_aw_lock_w;  logic [3:0]  xbar_m01_aw_cache_w;
+  logic [2:0]  xbar_m01_aw_prot_w;  logic [3:0]  xbar_m01_aw_qos_w;
+  logic [0:0]  xbar_m01_aw_user_w;
+  logic        xbar_m01_w_valid_w;   logic [31:0] xbar_m01_w_data_w;
+  logic [3:0]  xbar_m01_w_strb_w;   logic        xbar_m01_w_last_w;
+  logic [0:0]  xbar_m01_w_user_w;   logic        xbar_m01_b_ready_w;
+  logic        xbar_m01_ar_valid_w;  logic [0:0]  xbar_m01_ar_id_w;
+  logic [31:0] xbar_m01_ar_addr_w;  logic [7:0]  xbar_m01_ar_len_w;
+  logic [2:0]  xbar_m01_ar_size_w;  logic [1:0]  xbar_m01_ar_burst_w;
+  logic [0:0]  xbar_m01_ar_lock_w;  logic [3:0]  xbar_m01_ar_cache_w;
+  logic [2:0]  xbar_m01_ar_prot_w;  logic [3:0]  xbar_m01_ar_qos_w;
+  logic [0:0]  xbar_m01_ar_user_w;  logic        xbar_m01_r_ready_w;
+  logic        xbar_m01_aw_ready_w;  logic        xbar_m01_w_ready_w;
+  logic        xbar_m01_b_valid_w;   logic [0:0]  xbar_m01_b_id_w;
+  logic [1:0]  xbar_m01_b_resp_w;   logic [0:0]  xbar_m01_b_user_w;
+  logic        xbar_m01_ar_ready_w;  logic        xbar_m01_r_valid_w;
+  logic [0:0]  xbar_m01_r_id_w;     logic [31:0] xbar_m01_r_data_w;
+  logic [1:0]  xbar_m01_r_resp_w;   logic        xbar_m01_r_last_w;
+  logic [0:0]  xbar_m01_r_user_w;
+
+  always_comb begin : pack_m01_req
+    rx_axi_req_w          = '0;
+    rx_axi_req_w.aw_valid = xbar_m01_aw_valid_w;
+    rx_axi_req_w.aw.id    = xbar_m01_aw_id_w;
+    rx_axi_req_w.aw.addr  = xbar_m01_aw_addr_w;
+    rx_axi_req_w.aw.len   = xbar_m01_aw_len_w;
+    rx_axi_req_w.aw.size  = xbar_m01_aw_size_w;
+    rx_axi_req_w.aw.burst = xbar_m01_aw_burst_w;
+    rx_axi_req_w.aw.lock  = xbar_m01_aw_lock_w;
+    rx_axi_req_w.aw.cache = xbar_m01_aw_cache_w;
+    rx_axi_req_w.aw.prot  = xbar_m01_aw_prot_w;
+    rx_axi_req_w.aw.qos   = xbar_m01_aw_qos_w;
+    rx_axi_req_w.aw.user  = xbar_m01_aw_user_w;
+    rx_axi_req_w.w_valid  = xbar_m01_w_valid_w;
+    rx_axi_req_w.w.data   = xbar_m01_w_data_w;
+    rx_axi_req_w.w.strb   = xbar_m01_w_strb_w;
+    rx_axi_req_w.w.last   = xbar_m01_w_last_w;
+    rx_axi_req_w.w.user   = xbar_m01_w_user_w;
+    rx_axi_req_w.b_ready  = xbar_m01_b_ready_w;
+    rx_axi_req_w.ar_valid = xbar_m01_ar_valid_w;
+    rx_axi_req_w.ar.id    = xbar_m01_ar_id_w;
+    rx_axi_req_w.ar.addr  = xbar_m01_ar_addr_w;
+    rx_axi_req_w.ar.len   = xbar_m01_ar_len_w;
+    rx_axi_req_w.ar.size  = xbar_m01_ar_size_w;
+    rx_axi_req_w.ar.burst = xbar_m01_ar_burst_w;
+    rx_axi_req_w.ar.lock  = xbar_m01_ar_lock_w;
+    rx_axi_req_w.ar.cache = xbar_m01_ar_cache_w;
+    rx_axi_req_w.ar.prot  = xbar_m01_ar_prot_w;
+    rx_axi_req_w.ar.qos   = xbar_m01_ar_qos_w;
+    rx_axi_req_w.ar.user  = xbar_m01_ar_user_w;
+    rx_axi_req_w.r_ready  = xbar_m01_r_ready_w;
+  end
+
+  assign xbar_m01_aw_ready_w = rx_axi_resp_w.aw_ready;
+  assign xbar_m01_w_ready_w  = rx_axi_resp_w.w_ready;
+  assign xbar_m01_b_valid_w  = rx_axi_resp_w.b_valid;
+  assign xbar_m01_b_id_w     = rx_axi_resp_w.b.id;
+  assign xbar_m01_b_resp_w   = rx_axi_resp_w.b.resp;
+  assign xbar_m01_b_user_w   = rx_axi_resp_w.b.user;
+  assign xbar_m01_ar_ready_w = rx_axi_resp_w.ar_ready;
+  assign xbar_m01_r_valid_w  = rx_axi_resp_w.r_valid;
+  assign xbar_m01_r_id_w     = rx_axi_resp_w.r.id;
+  assign xbar_m01_r_data_w   = rx_axi_resp_w.r.data;
+  assign xbar_m01_r_resp_w   = rx_axi_resp_w.r.resp;
+  assign xbar_m01_r_last_w   = rx_axi_resp_w.r.last;
+  assign xbar_m01_r_user_w   = rx_axi_resp_w.r.user;
+
+  // ---- M02 wires: RX Status (0x4002_0000 – 0x4002_FFFF) ----
+  logic        xbar_m02_aw_valid_w;  logic [0:0]  xbar_m02_aw_id_w;
+  logic [31:0] xbar_m02_aw_addr_w;  logic [7:0]  xbar_m02_aw_len_w;
+  logic [2:0]  xbar_m02_aw_size_w;  logic [1:0]  xbar_m02_aw_burst_w;
+  logic [0:0]  xbar_m02_aw_lock_w;  logic [3:0]  xbar_m02_aw_cache_w;
+  logic [2:0]  xbar_m02_aw_prot_w;  logic [3:0]  xbar_m02_aw_qos_w;
+  logic [0:0]  xbar_m02_aw_user_w;
+  logic        xbar_m02_w_valid_w;   logic [31:0] xbar_m02_w_data_w;
+  logic [3:0]  xbar_m02_w_strb_w;   logic        xbar_m02_w_last_w;
+  logic [0:0]  xbar_m02_w_user_w;   logic        xbar_m02_b_ready_w;
+  logic        xbar_m02_ar_valid_w;  logic [0:0]  xbar_m02_ar_id_w;
+  logic [31:0] xbar_m02_ar_addr_w;  logic [7:0]  xbar_m02_ar_len_w;
+  logic [2:0]  xbar_m02_ar_size_w;  logic [1:0]  xbar_m02_ar_burst_w;
+  logic [0:0]  xbar_m02_ar_lock_w;  logic [3:0]  xbar_m02_ar_cache_w;
+  logic [2:0]  xbar_m02_ar_prot_w;  logic [3:0]  xbar_m02_ar_qos_w;
+  logic [0:0]  xbar_m02_ar_user_w;  logic        xbar_m02_r_ready_w;
+  logic        xbar_m02_aw_ready_w;  logic        xbar_m02_w_ready_w;
+  logic        xbar_m02_b_valid_w;   logic [0:0]  xbar_m02_b_id_w;
+  logic [1:0]  xbar_m02_b_resp_w;   logic [0:0]  xbar_m02_b_user_w;
+  logic        xbar_m02_ar_ready_w;  logic        xbar_m02_r_valid_w;
+  logic [0:0]  xbar_m02_r_id_w;     logic [31:0] xbar_m02_r_data_w;
+  logic [1:0]  xbar_m02_r_resp_w;   logic        xbar_m02_r_last_w;
+  logic [0:0]  xbar_m02_r_user_w;
+
+  always_comb begin : pack_m02_req
+    sta_axi_req_w          = '0;
+    sta_axi_req_w.aw_valid = xbar_m02_aw_valid_w;
+    sta_axi_req_w.aw.id    = xbar_m02_aw_id_w;
+    sta_axi_req_w.aw.addr  = xbar_m02_aw_addr_w;
+    sta_axi_req_w.aw.len   = xbar_m02_aw_len_w;
+    sta_axi_req_w.aw.size  = xbar_m02_aw_size_w;
+    sta_axi_req_w.aw.burst = xbar_m02_aw_burst_w;
+    sta_axi_req_w.aw.lock  = xbar_m02_aw_lock_w;
+    sta_axi_req_w.aw.cache = xbar_m02_aw_cache_w;
+    sta_axi_req_w.aw.prot  = xbar_m02_aw_prot_w;
+    sta_axi_req_w.aw.qos   = xbar_m02_aw_qos_w;
+    sta_axi_req_w.aw.user  = xbar_m02_aw_user_w;
+    sta_axi_req_w.w_valid  = xbar_m02_w_valid_w;
+    sta_axi_req_w.w.data   = xbar_m02_w_data_w;
+    sta_axi_req_w.w.strb   = xbar_m02_w_strb_w;
+    sta_axi_req_w.w.last   = xbar_m02_w_last_w;
+    sta_axi_req_w.w.user   = xbar_m02_w_user_w;
+    sta_axi_req_w.b_ready  = xbar_m02_b_ready_w;
+    sta_axi_req_w.ar_valid = xbar_m02_ar_valid_w;
+    sta_axi_req_w.ar.id    = xbar_m02_ar_id_w;
+    sta_axi_req_w.ar.addr  = xbar_m02_ar_addr_w;
+    sta_axi_req_w.ar.len   = xbar_m02_ar_len_w;
+    sta_axi_req_w.ar.size  = xbar_m02_ar_size_w;
+    sta_axi_req_w.ar.burst = xbar_m02_ar_burst_w;
+    sta_axi_req_w.ar.lock  = xbar_m02_ar_lock_w;
+    sta_axi_req_w.ar.cache = xbar_m02_ar_cache_w;
+    sta_axi_req_w.ar.prot  = xbar_m02_ar_prot_w;
+    sta_axi_req_w.ar.qos   = xbar_m02_ar_qos_w;
+    sta_axi_req_w.ar.user  = xbar_m02_ar_user_w;
+    sta_axi_req_w.r_ready  = xbar_m02_r_ready_w;
+  end
+
+  assign xbar_m02_aw_ready_w = sta_axi_resp_w.aw_ready;
+  assign xbar_m02_w_ready_w  = sta_axi_resp_w.w_ready;
+  assign xbar_m02_b_valid_w  = sta_axi_resp_w.b_valid;
+  assign xbar_m02_b_id_w     = sta_axi_resp_w.b.id;
+  assign xbar_m02_b_resp_w   = sta_axi_resp_w.b.resp;
+  assign xbar_m02_b_user_w   = sta_axi_resp_w.b.user;
+  assign xbar_m02_ar_ready_w = sta_axi_resp_w.ar_ready;
+  assign xbar_m02_r_valid_w  = sta_axi_resp_w.r_valid;
+  assign xbar_m02_r_id_w     = sta_axi_resp_w.r.id;
+  assign xbar_m02_r_data_w   = sta_axi_resp_w.r.data;
+  assign xbar_m02_r_resp_w   = sta_axi_resp_w.r.resp;
+  assign xbar_m02_r_last_w   = sta_axi_resp_w.r.last;
+  assign xbar_m02_r_user_w   = sta_axi_resp_w.r.user;
+
+  // ---- Vivado AXI Switch IP ----
+  axi_crossbar i_xbar (
+    .aclk            (core_clk_i),
+    .aresetn         (rst_n),
+    .aresetn_out     (),
+    .pc_asserted     (),
+    .pc_status       (),
+    // S00: JTAG AXI master
+    .s00_axi_awid    (jtag_req_w.aw.id),
+    .s00_axi_awaddr  (jtag_req_w.aw.addr),
+    .s00_axi_awlen   (jtag_req_w.aw.len),
+    .s00_axi_awsize  (jtag_req_w.aw.size),
+    .s00_axi_awburst (jtag_req_w.aw.burst),
+    .s00_axi_awlock  (jtag_req_w.aw.lock),
+    .s00_axi_awcache (jtag_req_w.aw.cache),
+    .s00_axi_awprot  (jtag_req_w.aw.prot),
+    .s00_axi_awqos   (jtag_req_w.aw.qos),
+    .s00_axi_awuser  (jtag_req_w.aw.user),
+    .s00_axi_awvalid (jtag_req_w.aw_valid),
+    .s00_axi_awready (xbar_s00_aw_ready_w),
+    .s00_axi_wdata   (jtag_req_w.w.data),
+    .s00_axi_wstrb   (jtag_req_w.w.strb),
+    .s00_axi_wlast   (jtag_req_w.w.last),
+    .s00_axi_wuser   (jtag_req_w.w.user),
+    .s00_axi_wvalid  (jtag_req_w.w_valid),
+    .s00_axi_wready  (xbar_s00_w_ready_w),
+    .s00_axi_bid     (xbar_s00_b_id_w),
+    .s00_axi_bresp   (xbar_s00_b_resp_w),
+    .s00_axi_buser   (xbar_s00_b_user_w),
+    .s00_axi_bvalid  (xbar_s00_b_valid_w),
+    .s00_axi_bready  (jtag_req_w.b_ready),
+    .s00_axi_arid    (jtag_req_w.ar.id),
+    .s00_axi_araddr  (jtag_req_w.ar.addr),
+    .s00_axi_arlen   (jtag_req_w.ar.len),
+    .s00_axi_arsize  (jtag_req_w.ar.size),
+    .s00_axi_arburst (jtag_req_w.ar.burst),
+    .s00_axi_arlock  (jtag_req_w.ar.lock),
+    .s00_axi_arcache (jtag_req_w.ar.cache),
+    .s00_axi_arprot  (jtag_req_w.ar.prot),
+    .s00_axi_arqos   (jtag_req_w.ar.qos),
+    .s00_axi_aruser  (jtag_req_w.ar.user),
+    .s00_axi_arvalid (jtag_req_w.ar_valid),
+    .s00_axi_arready (xbar_s00_ar_ready_w),
+    .s00_axi_rid     (xbar_s00_r_id_w),
+    .s00_axi_rdata   (xbar_s00_r_data_w),
+    .s00_axi_rresp   (xbar_s00_r_resp_w),
+    .s00_axi_rlast   (xbar_s00_r_last_w),
+    .s00_axi_ruser   (xbar_s00_r_user_w),
+    .s00_axi_rvalid  (xbar_s00_r_valid_w),
+    .s00_axi_rready  (jtag_req_w.r_ready),
+    // M00: TX FIFO
+    .m00_axi_awid    (xbar_m00_aw_id_w),
+    .m00_axi_awaddr  (xbar_m00_aw_addr_w),
+    .m00_axi_awlen   (xbar_m00_aw_len_w),
+    .m00_axi_awsize  (xbar_m00_aw_size_w),
+    .m00_axi_awburst (xbar_m00_aw_burst_w),
+    .m00_axi_awlock  (xbar_m00_aw_lock_w),
+    .m00_axi_awcache (xbar_m00_aw_cache_w),
+    .m00_axi_awprot  (xbar_m00_aw_prot_w),
+    .m00_axi_awqos   (xbar_m00_aw_qos_w),
+    .m00_axi_awuser  (xbar_m00_aw_user_w),
+    .m00_axi_awvalid (xbar_m00_aw_valid_w),
+    .m00_axi_awready (xbar_m00_aw_ready_w),
+    .m00_axi_wdata   (xbar_m00_w_data_w),
+    .m00_axi_wstrb   (xbar_m00_w_strb_w),
+    .m00_axi_wlast   (xbar_m00_w_last_w),
+    .m00_axi_wuser   (xbar_m00_w_user_w),
+    .m00_axi_wvalid  (xbar_m00_w_valid_w),
+    .m00_axi_wready  (xbar_m00_w_ready_w),
+    .m00_axi_bid     (xbar_m00_b_id_w),
+    .m00_axi_bresp   (xbar_m00_b_resp_w),
+    .m00_axi_buser   (xbar_m00_b_user_w),
+    .m00_axi_bvalid  (xbar_m00_b_valid_w),
+    .m00_axi_bready  (xbar_m00_b_ready_w),
+    .m00_axi_arid    (xbar_m00_ar_id_w),
+    .m00_axi_araddr  (xbar_m00_ar_addr_w),
+    .m00_axi_arlen   (xbar_m00_ar_len_w),
+    .m00_axi_arsize  (xbar_m00_ar_size_w),
+    .m00_axi_arburst (xbar_m00_ar_burst_w),
+    .m00_axi_arlock  (xbar_m00_ar_lock_w),
+    .m00_axi_arcache (xbar_m00_ar_cache_w),
+    .m00_axi_arprot  (xbar_m00_ar_prot_w),
+    .m00_axi_arqos   (xbar_m00_ar_qos_w),
+    .m00_axi_aruser  (xbar_m00_ar_user_w),
+    .m00_axi_arvalid (xbar_m00_ar_valid_w),
+    .m00_axi_arready (xbar_m00_ar_ready_w),
+    .m00_axi_rid     (xbar_m00_r_id_w),
+    .m00_axi_rdata   (xbar_m00_r_data_w),
+    .m00_axi_rresp   (xbar_m00_r_resp_w),
+    .m00_axi_rlast   (xbar_m00_r_last_w),
+    .m00_axi_ruser   (xbar_m00_r_user_w),
+    .m00_axi_rvalid  (xbar_m00_r_valid_w),
+    .m00_axi_rready  (xbar_m00_r_ready_w),
+    // M01: RX FIFO
+    .m01_axi_awid    (xbar_m01_aw_id_w),
+    .m01_axi_awaddr  (xbar_m01_aw_addr_w),
+    .m01_axi_awlen   (xbar_m01_aw_len_w),
+    .m01_axi_awsize  (xbar_m01_aw_size_w),
+    .m01_axi_awburst (xbar_m01_aw_burst_w),
+    .m01_axi_awlock  (xbar_m01_aw_lock_w),
+    .m01_axi_awcache (xbar_m01_aw_cache_w),
+    .m01_axi_awprot  (xbar_m01_aw_prot_w),
+    .m01_axi_awqos   (xbar_m01_aw_qos_w),
+    .m01_axi_awuser  (xbar_m01_aw_user_w),
+    .m01_axi_awvalid (xbar_m01_aw_valid_w),
+    .m01_axi_awready (xbar_m01_aw_ready_w),
+    .m01_axi_wdata   (xbar_m01_w_data_w),
+    .m01_axi_wstrb   (xbar_m01_w_strb_w),
+    .m01_axi_wlast   (xbar_m01_w_last_w),
+    .m01_axi_wuser   (xbar_m01_w_user_w),
+    .m01_axi_wvalid  (xbar_m01_w_valid_w),
+    .m01_axi_wready  (xbar_m01_w_ready_w),
+    .m01_axi_bid     (xbar_m01_b_id_w),
+    .m01_axi_bresp   (xbar_m01_b_resp_w),
+    .m01_axi_buser   (xbar_m01_b_user_w),
+    .m01_axi_bvalid  (xbar_m01_b_valid_w),
+    .m01_axi_bready  (xbar_m01_b_ready_w),
+    .m01_axi_arid    (xbar_m01_ar_id_w),
+    .m01_axi_araddr  (xbar_m01_ar_addr_w),
+    .m01_axi_arlen   (xbar_m01_ar_len_w),
+    .m01_axi_arsize  (xbar_m01_ar_size_w),
+    .m01_axi_arburst (xbar_m01_ar_burst_w),
+    .m01_axi_arlock  (xbar_m01_ar_lock_w),
+    .m01_axi_arcache (xbar_m01_ar_cache_w),
+    .m01_axi_arprot  (xbar_m01_ar_prot_w),
+    .m01_axi_arqos   (xbar_m01_ar_qos_w),
+    .m01_axi_aruser  (xbar_m01_ar_user_w),
+    .m01_axi_arvalid (xbar_m01_ar_valid_w),
+    .m01_axi_arready (xbar_m01_ar_ready_w),
+    .m01_axi_rid     (xbar_m01_r_id_w),
+    .m01_axi_rdata   (xbar_m01_r_data_w),
+    .m01_axi_rresp   (xbar_m01_r_resp_w),
+    .m01_axi_rlast   (xbar_m01_r_last_w),
+    .m01_axi_ruser   (xbar_m01_r_user_w),
+    .m01_axi_rvalid  (xbar_m01_r_valid_w),
+    .m01_axi_rready  (xbar_m01_r_ready_w),
+    // M02: RX Status
+    .m02_axi_awid    (xbar_m02_aw_id_w),
+    .m02_axi_awaddr  (xbar_m02_aw_addr_w),
+    .m02_axi_awlen   (xbar_m02_aw_len_w),
+    .m02_axi_awsize  (xbar_m02_aw_size_w),
+    .m02_axi_awburst (xbar_m02_aw_burst_w),
+    .m02_axi_awlock  (xbar_m02_aw_lock_w),
+    .m02_axi_awcache (xbar_m02_aw_cache_w),
+    .m02_axi_awprot  (xbar_m02_aw_prot_w),
+    .m02_axi_awqos   (xbar_m02_aw_qos_w),
+    .m02_axi_awuser  (xbar_m02_aw_user_w),
+    .m02_axi_awvalid (xbar_m02_aw_valid_w),
+    .m02_axi_awready (xbar_m02_aw_ready_w),
+    .m02_axi_wdata   (xbar_m02_w_data_w),
+    .m02_axi_wstrb   (xbar_m02_w_strb_w),
+    .m02_axi_wlast   (xbar_m02_w_last_w),
+    .m02_axi_wuser   (xbar_m02_w_user_w),
+    .m02_axi_wvalid  (xbar_m02_w_valid_w),
+    .m02_axi_wready  (xbar_m02_w_ready_w),
+    .m02_axi_bid     (xbar_m02_b_id_w),
+    .m02_axi_bresp   (xbar_m02_b_resp_w),
+    .m02_axi_buser   (xbar_m02_b_user_w),
+    .m02_axi_bvalid  (xbar_m02_b_valid_w),
+    .m02_axi_bready  (xbar_m02_b_ready_w),
+    .m02_axi_arid    (xbar_m02_ar_id_w),
+    .m02_axi_araddr  (xbar_m02_ar_addr_w),
+    .m02_axi_arlen   (xbar_m02_ar_len_w),
+    .m02_axi_arsize  (xbar_m02_ar_size_w),
+    .m02_axi_arburst (xbar_m02_ar_burst_w),
+    .m02_axi_arlock  (xbar_m02_ar_lock_w),
+    .m02_axi_arcache (xbar_m02_ar_cache_w),
+    .m02_axi_arprot  (xbar_m02_ar_prot_w),
+    .m02_axi_arqos   (xbar_m02_ar_qos_w),
+    .m02_axi_aruser  (xbar_m02_ar_user_w),
+    .m02_axi_arvalid (xbar_m02_ar_valid_w),
+    .m02_axi_arready (xbar_m02_ar_ready_w),
+    .m02_axi_rid     (xbar_m02_r_id_w),
+    .m02_axi_rdata   (xbar_m02_r_data_w),
+    .m02_axi_rresp   (xbar_m02_r_resp_w),
+    .m02_axi_rlast   (xbar_m02_r_last_w),
+    .m02_axi_ruser   (xbar_m02_r_user_w),
+    .m02_axi_rvalid  (xbar_m02_r_valid_w),
+    .m02_axi_rready  (xbar_m02_r_ready_w)
   );
 
   // =========================================================================

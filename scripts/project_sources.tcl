@@ -27,8 +27,6 @@ proc bsg_link_project_add_sources {repo_root} {
 
   set incdirs [list \
       $bsl/bsg_misc \
-      $rtl/axi_crossbar/axi/include \
-      $rtl/axi_crossbar/common_cells/common_cells/include \
   ]
   set_property include_dirs $incdirs [get_filesets sources_1]
   set_property include_dirs $incdirs [get_filesets sim_1]
@@ -75,35 +73,7 @@ proc bsg_link_project_add_sources {repo_root} {
       $bsl/bsg_link/bsg_link_ddr_upstream.sv \
       $bsl/bsg_link/bsg_link_ddr_downstream.sv \
       \
-      $rtl/axi_crossbar/common_cells/common_cells/src/cf_math_pkg.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/addr_decode.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/addr_decode_dync.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/lzc.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/onehot_to_bin.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/rr_arb_tree.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/counter.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/delta_counter.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/fifo_v3.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/fall_through_register.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/spill_register_flushable.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/spill_register.sv \
-      $rtl/axi_crossbar/common_cells/common_cells/src/id_queue.sv \
-      \
-      $rtl/axi_crossbar/axi/src/axi_pkg.sv \
-      $rtl/axi_crossbar/axi/src/rand_id_queue_pkg.sv \
-      $rtl/axi_crossbar/axi/src/axi_err_slv.sv \
-      $rtl/axi_crossbar/axi/src/axi_cut.sv \
-      $rtl/axi_crossbar/axi/src/axi_multicut.sv \
-      $rtl/axi_crossbar/axi/src/axi_id_prepend.sv \
-      $rtl/axi_crossbar/axi/src/axi_demux_id_counters.sv \
-      $rtl/axi_crossbar/axi/src/axi_demux_simple.sv \
-      $rtl/axi_crossbar/axi/src/axi_demux.sv \
-      $rtl/axi_crossbar/axi/src/axi_mux.sv \
-      $rtl/axi_crossbar/axi/src/axi_xbar_unmuxed.sv \
-      $rtl/axi_crossbar/axi/src/axi_xbar.sv \
-      \
       $rtl/bsg_link_xbar_pkg.sv \
-      $rtl/bsg_link_xbar.sv \
       $rtl/bsg_link_axi_tx_fifo.sv \
       $rtl/bsg_link_axi_rx_fifo.sv \
       $rtl/bsg_link_axi_rx_status.sv \

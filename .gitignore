@@ -14,3 +14,32 @@
 /vivado*.str
 /constraints/reports/
 
+# xsim artifacts
+sim/xsim.dir/
+sim/xsim.ini
+sim/xsim.jou
+sim/xsim.log
+sim/xsim.tcl
+sim/xelab.log
+sim/xelab.pb
+sim/xvlog.log
+sim/xvlog.pb
+sim/sim_snap.wdb
+sim/open_wave.tcl
+
+# VCS artifacts
+sim/csrc/
+sim/simv
+sim/simv.daidir/
+sim/ucli.key
+sim/vc_hdrs.h
+sim/novas_dump.log
+sim/waveform.fsdb
+sim/filelist
+
+# Vivado logs in sim/
+sim/vivado*.jou
+sim/vivado*.log
+sim/vivado*.str
+sim/sim.log
+

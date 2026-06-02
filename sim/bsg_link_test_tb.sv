@@ -58,7 +58,6 @@ module bsg_link_test_tb ();
 
   // Simulation AXI master bus
   import bsg_link_xbar_pkg::*;
-  import axi_pkg::*;
   slv_req_t  sim_req;
   slv_resp_t sim_resp;
 
@@ -257,8 +256,10 @@ module bsg_link_test_tb ();
   logic [31:0] pattern_b [N];
 
   initial begin
+`ifdef FSDB
     $fsdbDumpfile("waveform.fsdb");
     $fsdbDumpvars(0, bsg_link_test_tb, "+struct", "+mda");
+`endif
 
     
     $display("=== bsg_link_test_tb start ===");

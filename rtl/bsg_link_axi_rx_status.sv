@@ -130,7 +130,7 @@ module bsg_link_axi_rx_status
     axi_resp_o.r_valid  = (r_state_r == R_RESP);
     axi_resp_o.r.id     = ar_id_r;
     axi_resp_o.r.data   = r_data_r;
-    axi_resp_o.r.resp   = r_slverr_r ? axi_pkg::RESP_SLVERR : axi_pkg::RESP_OKAY;
+    axi_resp_o.r.resp   = r_slverr_r ? RESP_SLVERR : RESP_OKAY;
     axi_resp_o.r.last   = 1'b1;
     // AW: accept when write SM idle
     axi_resp_o.aw_ready = (w_state_r == W_IDLE);
@@ -140,7 +140,7 @@ module bsg_link_axi_rx_status
     // B: valid when write SM in RESP state
     axi_resp_o.b_valid  = (w_state_r == W_RESP);
     axi_resp_o.b.id     = aw_id_r;
-    axi_resp_o.b.resp   = w_slverr_r ? axi_pkg::RESP_SLVERR : axi_pkg::RESP_OKAY;
+    axi_resp_o.b.resp   = w_slverr_r ? RESP_SLVERR : RESP_OKAY;
   end
 
 endmodule : bsg_link_axi_rx_status
