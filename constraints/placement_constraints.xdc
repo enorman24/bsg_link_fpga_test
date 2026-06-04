@@ -54,11 +54,14 @@ set_property PACKAGE_PIN AH2  [get_ports {upstream_io_data_r_o[0][2]}]
 set_property PACKAGE_PIN AH4  [get_ports {upstream_io_data_r_o[0][3]}]
 set_property PACKAGE_PIN AG10 [get_ports {upstream_io_data_r_o[0][4]}]
 set_property PACKAGE_PIN AH7  [get_ports {upstream_io_data_r_o[0][5]}]
-set_property PACKAGE_PIN AB11 [get_ports {upstream_io_data_r_o[0][6]}]
+# data[6]/[9]/[10] pulled from GPIO_1 positions D18/D26/D28 (banks 66/67) onto
+# free GPIO_1 positions D1/D11/D25 — all bank 65 / region X3Y1. Upstream stays
+# 100% on the FMC_HPC1 F2G GPIO_1 header; see pblock_link_tx at end of file.
+set_property PACKAGE_PIN AD6  [get_ports {upstream_io_data_r_o[0][6]}]
 set_property PACKAGE_PIN AF11 [get_ports {upstream_io_data_r_o[0][7]}]
 set_property PACKAGE_PIN AE10 [get_ports {upstream_io_data_r_o[0][8]}]
-set_property PACKAGE_PIN U10  [get_ports {upstream_io_data_r_o[0][9]}]
-set_property PACKAGE_PIN W12  [get_ports {upstream_io_data_r_o[0][10]}]
+set_property PACKAGE_PIN AJ2  [get_ports {upstream_io_data_r_o[0][9]}]
+set_property PACKAGE_PIN AF10 [get_ports {upstream_io_data_r_o[0][10]}]
 set_property PACKAGE_PIN AF3  [get_ports {upstream_io_data_r_o[0][11]}]
 set_property PACKAGE_PIN AJ1  [get_ports {upstream_io_data_r_o[0][12]}]
 set_property PACKAGE_PIN AJ4  [get_ports {upstream_io_data_r_o[0][13]}]
@@ -124,11 +127,13 @@ set_property PACKAGE_PIN AB8  [get_ports {downstream_io_data_i[0][2]}]
 set_property PACKAGE_PIN P11   [get_ports {downstream_io_data_i[0][3]}]
 set_property PACKAGE_PIN L13  [get_ports {downstream_io_data_i[0][4]}]
 set_property PACKAGE_PIN P12  [get_ports {downstream_io_data_i[0][5]}]
-set_property PACKAGE_PIN L16  [get_ports {downstream_io_data_i[0][6]}]
+# data[6]/[9]/[10] moved to GPIO_0 positions D1/D11/D25 to mirror the upstream
+# re-pin above and keep the loopback ribbon straight-through (GPIO_1 Dn <-> GPIO_0 Dn).
+set_property PACKAGE_PIN AA6  [get_ports {downstream_io_data_i[0][6]}]
 set_property PACKAGE_PIN AA2  [get_ports {downstream_io_data_i[0][7]}]
 set_property PACKAGE_PIN V2  [get_ports {downstream_io_data_i[0][8]}]
-set_property PACKAGE_PIN AB3  [get_ports {downstream_io_data_i[0][9]}]
-set_property PACKAGE_PIN L12   [get_ports {downstream_io_data_i[0][10]}]
+set_property PACKAGE_PIN AC8  [get_ports {downstream_io_data_i[0][9]}]
+set_property PACKAGE_PIN AC3  [get_ports {downstream_io_data_i[0][10]}]
 set_property PACKAGE_PIN AB5  [get_ports {downstream_io_data_i[0][11]}]
 set_property PACKAGE_PIN Y9  [get_ports {downstream_io_data_i[0][12]}]
 set_property PACKAGE_PIN N11   [get_ports {downstream_io_data_i[0][13]}]
@@ -190,11 +195,16 @@ set_property IOSTANDARD        SSTL18_I   $placement_bsg_token_out_ports;
 # add_cells_to_pblock [get_pblocks pblock_down01] [get_cells -quiet [list downlink downstream_node]]
 # resize_pblock       [get_pblocks pblock_down01] -add {CLOCKREGION_X4Y5:CLOCKREGION_X4Y5}
 
-# Derived inactive template for this design:
-# create_pblock                    pblock_up01
-# add_cells_to_pblock [get_pblocks pblock_up01] [get_cells -quiet [list link_tx_i]]
-# resize_pblock       [get_pblocks pblock_up01] -add {CLOCKREGION_X?Y?:CLOCKREGION_X?Y?}
-#
-# create_pblock                    pblock_down01
-# add_cells_to_pblock [get_pblocks pblock_down01] [get_cells -quiet [list link_rx_i]]
-# resize_pblock       [get_pblocks pblock_down01] -add {CLOCKREGION_X?Y?:CLOCKREGION_X?Y?}
+# Confine the upstream link (incl. its OSERDES) to the single clock region that
+# now holds all 18 TX outputs + token (bank 65 = CLOCKREGION_X3Y1). This pulls
+# the data-launch logic next to the forwarded-clock OSERDES, cutting the
+# data-vs-clock output skew that caused the post-route setup failure.
+create_pblock                    pblock_link_tx
+add_cells_to_pblock [get_pblocks pblock_link_tx] [get_cells -quiet [list link_tx_i]]
+resize_pblock       [get_pblocks pblock_link_tx] -add {CLOCKREGION_X3Y1:CLOCKREGION_X3Y1}
+
+# Downstream (link_rx_i) is input-side and meets timing; left unconstrained.
+# Template if you later want to floorplan it too:
+# create_pblock                    pblock_link_rx
+# add_cells_to_pblock [get_pblocks pblock_link_rx] [get_cells -quiet [list link_rx_i]]
+# resize_pblock       [get_pblocks pblock_link_rx] -add {CLOCKREGION_X?Y?:CLOCKREGION_X?Y?}

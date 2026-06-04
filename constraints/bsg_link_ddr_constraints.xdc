@@ -51,11 +51,32 @@ set fmc_output_clk_pin           [get_pins link_tx_i/ch[0].oddr_phy/ODDRE1_clk/C
 set fmc_output_clk_port          [get_ports {upstream_io_clk_r_o[0]}]
 create_generated_clock -name $fmc_output_clk_name -source $fmc_output_clk_pin -edges {1 2 3} -edge_shift {0 0 0} $fmc_output_clk_port
 
-# input delay margins
-set dv_bre                 1.0
-set dv_are                 1.0
-set dv_bfe                 1.0
-set dv_afe                 1.0
+# ---- Shared source-synchronous margin budget (TX output == RX input) ----
+# This link is a loopback: the upstream_io_* outputs feed the downstream_io_*
+# inputs through the ribbon, so both ends model the SAME physical link and must
+# reserve the SAME data-to-forwarded-clock margin. These two numbers therefore
+# drive BOTH the RX set_input_delay (below) and the TX set_output_delay (further
+# down) — do not let them drift apart.
+#
+# Anchored to the verified receiver: in the routed build the downstream IDDRE1
+# captures the looped-back data with +0.6 ns setup / +0.04 ns hold under this
+# 1.0 ns budget (report_timing -to link_rx_i/ch[0].iddr_phy/.../IDDRE1_inst/D,
+# group downstream_io_clk_0). So 1.0 ns is not a guess — it is the margin the
+# real capture flop is shown to tolerate with positive slack.
+#
+# Budget = IDDRE1 setup/hold (after the FIXED IDELAYE3, DELAY_VALUE=192)
+#        + data<->clk skew through the ribbon + 2x F2G GPIO headers + guardband.
+# Refine on hardware (bench IDELAY tap sweep) and re-tighten. NOTE: the hold side
+# is the real risk (downstream hold is only +0.04 ns, set by DELAY_VALUE), and an
+# IDELAYCTRL (REFCLK 500 MHz) must be added before these numbers hold on silicon.
+set link_setup_margin      1.0
+set link_hold_margin       1.0
+
+# input delay margins (RX) — driven by the shared budget
+set dv_bre                 $link_setup_margin
+set dv_are                 $link_hold_margin
+set dv_bfe                 $link_setup_margin
+set dv_afe                 $link_hold_margin
 
 # input delay constraints
 #
@@ -91,11 +112,14 @@ set_input_delay -clock $fmc_input_clk_name -min $dv_are                         
 set_input_delay -clock $fmc_input_clk_name -max [expr $fmc_input_clk_period/2 - $dv_bfe] $fmc_input_data_port -clock_fall -add_delay
 set_input_delay -clock $fmc_input_clk_name -min $dv_afe                                  $fmc_input_data_port -clock_fall -add_delay
 
-# output delay margins
-set tsu_r                  0.8
-set thd_r                  0.8
-set tsu_f                  0.8
-set thd_f                  0.8
+# output delay margins (TX) — SAME shared budget as the RX input above.
+# Was 0.8 (sample placeholder, inconsistent with the 1.0 ns RX model). Driving
+# both ends from link_setup_margin/link_hold_margin makes the TX output_delay
+# reserve exactly the margin the receiver is verified to need.
+set tsu_r                  $link_setup_margin
+set thd_r                  $link_hold_margin
+set tsu_f                  $link_setup_margin
+set thd_f                  $link_hold_margin
 
 # output delay constraints
 #

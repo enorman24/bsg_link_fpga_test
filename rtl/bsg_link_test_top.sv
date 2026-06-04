@@ -45,8 +45,6 @@ module bsg_link_test_top
 
   input  logic [NUM_CHANNELS_P-1:0]                      token_clk_i,
 
-  input  logic                                           rst_i,
-
   // ---- BSG Link TX outputs → ribbon cable ----
   output logic [NUM_CHANNELS_P-1:0]                      upstream_io_clk_r_o,
   output logic [NUM_CHANNELS_P-1:0][CHANNEL_WIDTH_P-1:0] upstream_io_data_r_o,
@@ -60,7 +58,10 @@ module bsg_link_test_top
 `ifdef SIM
   // Simulation-only ports — absent in synthesis.
   // core_clk_i: testbench-driven clock replacing clk_wiz_0 output.
+  // rst_i:      testbench-driven reset. On hardware there is no external reset
+  //             pad — reset comes from vio_0 (held at config) and the MMCM lock.
   ,input  logic      core_clk_i
+  ,input  logic      rst_i
   ,input  slv_req_t  sim_req_i
   ,output slv_resp_t sim_resp_o
 `endif
@@ -70,13 +71,20 @@ module bsg_link_test_top
     $error("FLIT_WIDTH_P (%0d) must equal AxiDataWidth (%0d) from bsg_link_xbar_pkg",
            FLIT_WIDTH_P, AxiDataWidth);
 
-  // VIO probe_out0 drives reset from Vivado hardware manager (init=1 = held in reset).
-  // In simulation the wire defaults to 0 so only rst_i controls reset.
+  // Reset sources:
+  //   Hardware  : vio_0 probe_out0 (init=1 = held in reset) OR'd with ~MMCM-lock.
+  //               There is no external reset pad in synthesis.
+  //   Simulation: testbench rst_i (no VIO present; vio_rst_w tied 0).
   logic core_clk_w;
   logic mmcm_locked_w;
-  logic vio_rst_w = 1'b0;
+  logic vio_rst_w;            // driven by vio_0 (synth) or tied 0 (sim) — single driver
   logic rst_int_w;
+`ifdef SIM
+  assign vio_rst_w = 1'b0;
   assign rst_int_w = rst_i | vio_rst_w | ~mmcm_locked_w;
+`else
+  assign rst_int_w = vio_rst_w | ~mmcm_locked_w;
+`endif
 
   logic rst_n;
   assign rst_n = ~rst_int_w;
