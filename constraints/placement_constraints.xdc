@@ -45,7 +45,7 @@ set_property DCI_CASCADE {64} [get_iobanks 65]
 # set_property PACKAGE_PIN G13      [get_ports {fmc_data_o[0] }];
 #
 # Translated:
-set_property PACKAGE_PIN AF10 [get_ports {upstream_io_clk_r_o[0]}]
+set_property PACKAGE_PIN AD7  [get_ports {upstream_io_clk_r_o[0]}]
 set_property PACKAGE_PIN AG11 [get_ports {upstream_io_valid_r_o[0]}]
 
 set_property PACKAGE_PIN AE3  [get_ports {upstream_io_data_r_o[0][0]}]
@@ -65,7 +65,7 @@ set_property PACKAGE_PIN AJ4  [get_ports {upstream_io_data_r_o[0][13]}]
 set_property PACKAGE_PIN AG9  [get_ports {upstream_io_data_r_o[0][14]}]
 set_property PACKAGE_PIN AH6  [get_ports {upstream_io_data_r_o[0][15]}]
 
-set_property PACKAGE_PIN AB10 [get_ports {token_clk_i[0]}]
+set_property PACKAGE_PIN AE5  [get_ports {token_clk_i[0]}]
 
 set placement_bsg_up_out_ports [get_ports { \
   upstream_io_clk_r_o[0] \
@@ -115,27 +115,27 @@ set_property IOSTANDARD        SSTL18_I   $placement_bsg_token_in_ports;
 # set_property PACKAGE_PIN BF7      [get_ports {fmc_data_i[0] }];
 #
 # Translated:
-set_property PACKAGE_PIN AC6  [get_ports {downstream_io_clk_i[0]}]
-set_property PACKAGE_PIN AA12 [get_ports {downstream_io_valid_i[0]}]
+set_property PACKAGE_PIN AA7  [get_ports {downstream_io_clk_i[0]}]
+set_property PACKAGE_PIN AA1 [get_ports {downstream_io_valid_i[0]}]
 
-set_property PACKAGE_PIN V4   [get_ports {downstream_io_data_i[0][0]}]
-set_property PACKAGE_PIN Y2   [get_ports {downstream_io_data_i[0][1]}]
-set_property PACKAGE_PIN AC2  [get_ports {downstream_io_data_i[0][2]}]
-set_property PACKAGE_PIN W5   [get_ports {downstream_io_data_i[0][3]}]
-set_property PACKAGE_PIN Y12  [get_ports {downstream_io_data_i[0][4]}]
-set_property PACKAGE_PIN AC7  [get_ports {downstream_io_data_i[0][5]}]
-set_property PACKAGE_PIN N13  [get_ports {downstream_io_data_i[0][6]}]
-set_property PACKAGE_PIN M15  [get_ports {downstream_io_data_i[0][7]}]
-set_property PACKAGE_PIN M11  [get_ports {downstream_io_data_i[0][8]}]
-set_property PACKAGE_PIN M10  [get_ports {downstream_io_data_i[0][9]}]
-set_property PACKAGE_PIN V9   [get_ports {downstream_io_data_i[0][10]}]
-set_property PACKAGE_PIN V8   [get_ports {downstream_io_data_i[0][11]}]
-set_property PACKAGE_PIN V12  [get_ports {downstream_io_data_i[0][12]}]
-set_property PACKAGE_PIN V3   [get_ports {downstream_io_data_i[0][13]}]
-set_property PACKAGE_PIN Y1   [get_ports {downstream_io_data_i[0][14]}]
-set_property PACKAGE_PIN AC1  [get_ports {downstream_io_data_i[0][15]}]
+set_property PACKAGE_PIN AB6   [get_ports {downstream_io_data_i[0][0]}]
+set_property PACKAGE_PIN Y10   [get_ports {downstream_io_data_i[0][1]}]
+set_property PACKAGE_PIN AB8  [get_ports {downstream_io_data_i[0][2]}]
+set_property PACKAGE_PIN P11   [get_ports {downstream_io_data_i[0][3]}]
+set_property PACKAGE_PIN L13  [get_ports {downstream_io_data_i[0][4]}]
+set_property PACKAGE_PIN P12  [get_ports {downstream_io_data_i[0][5]}]
+set_property PACKAGE_PIN L16  [get_ports {downstream_io_data_i[0][6]}]
+set_property PACKAGE_PIN AA2  [get_ports {downstream_io_data_i[0][7]}]
+set_property PACKAGE_PIN V2  [get_ports {downstream_io_data_i[0][8]}]
+set_property PACKAGE_PIN AB3  [get_ports {downstream_io_data_i[0][9]}]
+set_property PACKAGE_PIN L12   [get_ports {downstream_io_data_i[0][10]}]
+set_property PACKAGE_PIN AB5  [get_ports {downstream_io_data_i[0][11]}]
+set_property PACKAGE_PIN Y9  [get_ports {downstream_io_data_i[0][12]}]
+set_property PACKAGE_PIN N11   [get_ports {downstream_io_data_i[0][13]}]
+set_property PACKAGE_PIN K13   [get_ports {downstream_io_data_i[0][14]}]
+set_property PACKAGE_PIN N12  [get_ports {downstream_io_data_i[0][15]}]
 
-set_property PACKAGE_PIN W4   [get_ports {downstream_core_token_r_o[0]}]
+set_property PACKAGE_PIN AB4  [get_ports {downstream_core_token_r_o[0]}]
 
 set placement_bsg_down_in_ports [get_ports { \
   downstream_io_clk_i[0] \

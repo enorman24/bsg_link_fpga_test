@@ -77,22 +77,135 @@ set_property -dict [list \
 ] [get_ips jtag_axi_0]
 generate_target all [get_ips jtag_axi_0]
 
-create_ip -name axi_switch -vendor xilinx.com -library ip -version 1.0 -module_name axi_crossbar
+create_ip -name axi_switch -vendor xilinx.com -library ip -version 1.0 -module_name axi_switch_0
 set_property -dict [list \
   CONFIG.M00_SEG00_BASE_ADDR {0x40000000} \
   CONFIG.M00_SEG00_HIGH_ADDR {0x000000004000FFFF} \
   CONFIG.M01_SEG00_BASE_ADDR {0x40010000} \
   CONFIG.M01_SEG00_HIGH_ADDR {0x4001FFFF} \
+  CONFIG.M02_AXI_PROTOCOL    {AXI4LITE} \
   CONFIG.M02_SEG00_BASE_ADDR {0x40020000} \
   CONFIG.M02_SEG00_HIGH_ADDR {0x4002FFFF} \
-  CONFIG.NUM_MI {3} \
-  CONFIG.NUM_SI {1} \
-  CONFIG.S00_AXI_ID_WIDTH {1} \
+  CONFIG.NUM_MI              {3} \
+  CONFIG.NUM_SI              {1} \
+  CONFIG.S00_AXI_ID_WIDTH    {1} \
   CONFIG.S00_SUPPORTS_NARROW {false} \
-  CONFIG.S00_SUPPORTS_WRAP {false} \
-  CONFIG.SAME_AS_M00 {true} \
-] [get_ips axi_crossbar]
-generate_target all [get_ips axi_crossbar]
+  CONFIG.S00_SUPPORTS_WRAP   {false} \
+  CONFIG.SAME_AS_M00         {false} \
+] [get_ips axi_switch_0]
+generate_target all [get_ips axi_switch_0]
+
+# ILA: JTAG AXI master ↔ AXI switch (S00)
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_jtag_sw
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {6} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {12} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+  CONFIG.C_PROBE2_WIDTH   {32} \
+  CONFIG.C_PROBE3_WIDTH   {32} \
+  CONFIG.C_PROBE4_WIDTH   {32} \
+  CONFIG.C_PROBE5_WIDTH   {4} \
+] [get_ips ila_jtag_sw]
+generate_target all [get_ips ila_jtag_sw]
+
+# ILA: AXI switch M00 ↔ TX FIFO
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_sw_tx
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {6} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {12} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+  CONFIG.C_PROBE2_WIDTH   {32} \
+  CONFIG.C_PROBE3_WIDTH   {32} \
+  CONFIG.C_PROBE4_WIDTH   {32} \
+  CONFIG.C_PROBE5_WIDTH   {4} \
+] [get_ips ila_sw_tx]
+generate_target all [get_ips ila_sw_tx]
+
+# ILA: AXI switch M01 ↔ RX FIFO
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_sw_rx
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {6} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {12} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+  CONFIG.C_PROBE2_WIDTH   {32} \
+  CONFIG.C_PROBE3_WIDTH   {32} \
+  CONFIG.C_PROBE4_WIDTH   {32} \
+  CONFIG.C_PROBE5_WIDTH   {4} \
+] [get_ips ila_sw_rx]
+generate_target all [get_ips ila_sw_rx]
+
+# ILA: AXI switch M02 ↔ RX status register map
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_sw_sta
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {6} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {12} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+  CONFIG.C_PROBE2_WIDTH   {32} \
+  CONFIG.C_PROBE3_WIDTH   {32} \
+  CONFIG.C_PROBE4_WIDTH   {32} \
+  CONFIG.C_PROBE5_WIDTH   {4} \
+] [get_ips ila_sw_sta]
+generate_target all [get_ips ila_sw_sta]
+
+# ILA: TX FIFO ↔ BSG link TX core
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_tx_bsg
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {2} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {2} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+] [get_ips ila_tx_bsg]
+generate_target all [get_ips ila_tx_bsg]
+
+# ILA: RX FIFO ↔ BSG link RX core
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_rx_bsg
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {2} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {2} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+] [get_ips ila_rx_bsg]
+generate_target all [get_ips ila_rx_bsg]
+
+# ILA: RX FIFO status signals ↔ RX status register map
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_rx_sta
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {1} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {8} \
+] [get_ips ila_rx_sta]
+generate_target all [get_ips ila_rx_sta]
+
+create_ip -name vio -vendor xilinx.com -library ip -version 3.0 -module_name vio_0
+set_property -dict [list \
+  CONFIG.C_NUM_PROBE_IN        {0} \
+  CONFIG.C_PROBE_OUT0_INIT_VAL {0x1} \
+] [get_ips vio_0]
+generate_target all [get_ips vio_0]
+
+create_ip -name clk_wiz -vendor xilinx.com -library ip -version 6.0 -module_name clk_wiz_0
+set_property -dict [list \
+  CONFIG.CLKIN1_JITTER_PS              {33.330000000000005} \
+  CONFIG.CLKOUT1_JITTER                {116.415} \
+  CONFIG.CLKOUT1_PHASE_ERROR           {77.836} \
+  CONFIG.CLKOUT1_REQUESTED_OUT_FREQ    {50.000} \
+  CONFIG.CLKOUT2_USED                  {true} \
+  CONFIG.CLKOUT2_REQUESTED_OUT_FREQ    {50.000} \
+  CONFIG.CLKOUT2_REQUESTED_PHASE       {90.000} \
+  CONFIG.CLK_IN1_BOARD_INTERFACE       {user_si570_sysclk} \
+  CONFIG.MMCM_CLKFBOUT_MULT_F          {4.000} \
+  CONFIG.MMCM_CLKIN1_PERIOD            {3.333} \
+  CONFIG.MMCM_CLKIN2_PERIOD            {10.0} \
+  CONFIG.MMCM_CLKOUT0_DIVIDE_F         {24.000} \
+  CONFIG.PRIM_IN_FREQ                  {300.000} \
+  CONFIG.PRIM_SOURCE                   {Differential_clock_capable_pin} \
+  CONFIG.USE_RESET                     {false} \
+] [get_ips clk_wiz_0]
+generate_target all [get_ips clk_wiz_0]
 
 set_property top $TOP_MODULE [get_filesets sources_1]
 update_compile_order -fileset sources_1

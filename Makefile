@@ -1,12 +1,12 @@
 PROJ_NAME := bsg_link_vivado
 BUILD_DIR  := build
 LOG_DIR    := $(BUILD_DIR)/logs
-JOBS       := 30
+JOBS       := 6
 VIVADO     := vivado -mode batch
 
 export BSG_LINK_JOBS := $(JOBS)
 
-.PHONY: create-project recreate-project synth impl verify
+.PHONY: create-project recreate-project synth impl verify clean
 
 $(LOG_DIR):
 	mkdir -p $@
@@ -35,3 +35,6 @@ verify: | $(LOG_DIR)
 	$(VIVADO) -source scripts/verify_project.tcl \
 	  -journal $(LOG_DIR)/verify_project.jou \
 	  -log     $(LOG_DIR)/verify_project.log
+
+clean:
+	rm -rf $(BUILD_DIR)

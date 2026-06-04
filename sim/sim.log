@@ -3,7 +3,7 @@
   **** SW Build 6140274 on Wed May 21 22:58:25 MDT 2025
   **** IP Build 6138677 on Thu May 22 03:10:11 MDT 2025
   **** SharedData Build 6139179 on Tue May 20 17:58:58 MDT 2025
-  **** Start of session at: Mon Jun  1 20:44:04 2026
+  **** Start of session at: Wed Jun  3 13:37:21 2026
     ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
     ** Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
 
@@ -18,18 +18,29 @@ source xsim.tcl
 === bsg_link_test_tb start ===
 [round-A] writing 8 words...
 [round-A] waiting for loopback...
+Error: axi_read addr=0x40020004: bad r.resp=X
+Time: 2056 ps  Iteration: 0  Process: /bsg_link_test_tb/axi_read  Scope: bsg_link_test_tb.axi_read  File: /home/enorman/bsg_link/bsg_link_vivado/sim/bsg_link_test_tb.sv Line: 187
 [round-A] RX count = 8
 [round-A] reading back...
+Error: axi_read addr=0x40020004: bad r.resp=X
+Time: 3440 ps  Iteration: 0  Process: /bsg_link_test_tb/axi_read  Scope: bsg_link_test_tb.axi_read  File: /home/enorman/bsg_link/bsg_link_vivado/sim/bsg_link_test_tb.sv Line: 187
+Error: axi_read addr=0x40020000: bad r.resp=X
+Time: 3608 ps  Iteration: 0  Process: /bsg_link_test_tb/axi_read  Scope: bsg_link_test_tb.axi_read  File: /home/enorman/bsg_link/bsg_link_vivado/sim/bsg_link_test_tb.sv Line: 187
 [round-A] PASS — all 8 words match.
 
 [round-B] writing 8 words...
 [round-B] waiting for loopback...
+Error: axi_read addr=0x40020004: bad r.resp=X
+Time: 5056 ps  Iteration: 0  Process: /bsg_link_test_tb/axi_read  Scope: bsg_link_test_tb.axi_read  File: /home/enorman/bsg_link/bsg_link_vivado/sim/bsg_link_test_tb.sv Line: 187
 [round-B] RX count = 8
 [round-B] reading back...
+Error: axi_read addr=0x40020004: bad r.resp=X
+Time: 6440 ps  Iteration: 0  Process: /bsg_link_test_tb/axi_read  Scope: bsg_link_test_tb.axi_read  File: /home/enorman/bsg_link/bsg_link_vivado/sim/bsg_link_test_tb.sv Line: 187
+Error: axi_read addr=0x40020000: bad r.resp=X
+Time: 6608 ps  Iteration: 0  Process: /bsg_link_test_tb/axi_read  Scope: bsg_link_test_tb.axi_read  File: /home/enorman/bsg_link/bsg_link_vivado/sim/bsg_link_test_tb.sv Line: 187
 [round-B] PASS — all 8 words match.
 
 === all rounds passed ===
-$finish called at time : 6513 ps : File "/data2/enorman/bsg_link_vivado/sim/bsg_link_test_tb.sv" Line 295
+$finish called at time : 6609 ps : File "/home/enorman/bsg_link/bsg_link_vivado/sim/bsg_link_test_tb.sv" Line 295
 ## quit
-INFO: xsimkernel Simulation Memory Usage: 510576 KB (Peak: 550888 KB), Simulation CPU Usage: 850 ms
-INFO: [Common 17-206] Exiting xsim at Mon Jun  1 20:44:06 2026...
+INFO: [Common 17-206] Exiting xsim at Wed Jun  3 13:37:25 2026...

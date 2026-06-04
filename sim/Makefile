@@ -1,9 +1,10 @@
-BASEJUMP_STL_DIR ?= /data2/enorman/basejump_stl
+BASEJUMP_STL_DIR ?= $(abspath ../../basejump_stl)
 export BASEJUMP_STL_DIR
 
-VIVADO_DATA   ?= /data/eda_tools/AMD/2025.1/data
+VIVADO_BIN    := $(shell command -v vivado 2>/dev/null)
+VIVADO_DATA   ?= $(abspath $(dir $(VIVADO_BIN))../data)
 BUILD_DIR     := ../build/bsg_link_vivado
-IP_SIM_DIR    := $(BUILD_DIR)/bsg_link_vivado.gen/sources_1/ip/axi_crossbar/sim
+IP_SIM_DIR    := $(BUILD_DIR)/bsg_link_vivado.gen/sources_1/ip/axi_switch_0/sim
 IP_STATIC_DIR := $(BUILD_DIR)/bsg_link_vivado.ip_user_files/ipstatic
 GLBL_V        := $(VIVADO_DATA)/verilog/src/glbl.v
 
@@ -72,7 +73,7 @@ compile: xsim.ini
 	  --include $(IP_STATIC_DIR)/hdl \
 	  --include $(VIVADO_DATA)/xilinx_vip/include \
 	  -work xil_defaultlib \
-	  $(IP_SIM_DIR)/axi_crossbar.sv
+	  $(IP_SIM_DIR)/axi_switch_0.sv
 	xvlog --incr --relax -work xil_defaultlib $(GLBL_V)
 	xvlog --sv --incr --relax \
 	  --define SIM \

@@ -66,11 +66,11 @@ proc bsg_link_project_add_sources {repo_root} {
       $bsl/bsg_dataflow/bsg_serial_in_parallel_out_full.sv \
       $bsl/bsg_dataflow/bsg_round_robin_1_to_n.sv \
       \
-      $bsl/bsg_link/bsg_link_oddr_phy.sv \
-      $bsl/bsg_link/bsg_link_iddr_phy.sv \
+      $bsl/hard/ultrascale_plus/bsg_link/bsg_link_oddr_phy.sv \
+      $bsl/hard/ultrascale_plus/bsg_link/bsg_link_iddr_phy.sv \
       $bsl/bsg_link/bsg_link_source_sync_upstream.sv \
       $bsl/bsg_link/bsg_link_source_sync_downstream.sv \
-      $bsl/bsg_link/bsg_link_ddr_upstream.sv \
+      $bsl/hard/ultrascale_plus/bsg_link/bsg_link_ddr_upstream.sv \
       $bsl/bsg_link/bsg_link_ddr_downstream.sv \
       \
       $rtl/bsg_link_xbar_pkg.sv \
