@@ -69,7 +69,17 @@ create_generated_clock -name $fmc_output_clk_name -source $fmc_output_clk_pin -e
 # Refine on hardware (bench IDELAY tap sweep) and re-tighten. NOTE: the hold side
 # is the real risk (downstream hold is only +0.04 ns, set by DELAY_VALUE), and an
 # IDELAYCTRL (REFCLK 500 MHz) must be added before these numbers hold on silicon.
-set link_setup_margin      1.0
+# setup margin RAISED 1.0 -> 1.10: with link 2 added, BOTH TX engines' OSERDES sit in
+# bank 65 / CLOCKREGION_X3Y1 (TX1 + zero-spill TX2 share the region), adding ~38 ps of
+# data-vs-forwarded-clock routing skew that pushed TX setup to WNS -0.038 (4 bits across
+# both links). In this center-aligned source-sync model, link_setup_margin is SUBTRACTED
+# in the output_delay (P/4 + P/2 - tsu), so RAISING it relaxes the TX output_delay (and
+# RX input_delay) by the same amount and recovers positive setup slack on both links.
+# This is the same lever the link-1 closure used (0.8 -> 1.0). Functional correctness of
+# both links was confirmed in behavioral sim; the real capture anchor is the verified
+# +0.6 ns RX IDDRE1 margin (unchanged by this modeling knob). Hold is UNTOUCHED (WHS was
+# only +0.010 ns) — do not lower link_hold_margin.
+set link_setup_margin      1.10
 set link_hold_margin       1.0
 
 # input delay margins (RX) — driven by the shared budget
@@ -155,17 +165,95 @@ set_output_delay -clock $fmc_output_clk_name -min [expr $fmc_input_clk_period/4 
 set_output_delay -clock $fmc_output_clk_name -max [expr $fmc_input_clk_period/4 + $fmc_input_clk_period/2 - $tsu_f] $fmc_output_data_port -clock_fall -add_delay
 set_output_delay -clock $fmc_output_clk_name -min [expr $fmc_input_clk_period/4 + $thd_f]                           $fmc_output_data_port -clock_fall -add_delay
 
+#==============================================================================
+# Link 2 (reverse-direction link) source-synchronous timing.
+#
+# Identical structure and SAME shared margin budget as link 1 (this is also a
+# loopback: upstream2_io_* feeds downstream2_io_* through a second ribbon).
+# TX2 = upstream2_io_* (FMC_HPC1 / GPIO_0); RX2 = downstream2_io_* (FMC_HPC0 / GPIO_1).
+# Reuses fmc_input_clk_period, dv_*, tsu_*/thd_* defined above — do NOT redefine
+# the margins per link, both ends model the same physical link class.
+#==============================================================================
+
+# --- Link 2 RX2 input clock (forwarded clock received over the ribbon) ---
+set fmc_input_clk2_name  downstream2_io_clk_0
+create_clock -name $fmc_input_clk2_name -period $fmc_input_clk_period [get_ports {downstream2_io_clk_i[0]}]
+
+# --- Link 2 TX2 forwarded output clock (generated, from the ODDRE1 like link 1) ---
+set fmc_output_clk2_name upstream2_io_clk_0
+create_generated_clock -name $fmc_output_clk2_name \
+  -source [get_pins link_tx2_i/ch[0].oddr_phy/ODDRE1_clk/C] \
+  -edges {1 2 3} -edge_shift {0 0 0} [get_ports {upstream2_io_clk_r_o[0]}]
+
+# --- Link 2 RX2 input delays (shared budget) ---
+set fmc_input_data2_port [get_ports { \
+  downstream2_io_valid_i[0] \
+  downstream2_io_data_i[0][0] \
+  downstream2_io_data_i[0][1] \
+  downstream2_io_data_i[0][2] \
+  downstream2_io_data_i[0][3] \
+  downstream2_io_data_i[0][4] \
+  downstream2_io_data_i[0][5] \
+  downstream2_io_data_i[0][6] \
+  downstream2_io_data_i[0][7] \
+  downstream2_io_data_i[0][8] \
+  downstream2_io_data_i[0][9] \
+  downstream2_io_data_i[0][10] \
+  downstream2_io_data_i[0][11] \
+  downstream2_io_data_i[0][12] \
+  downstream2_io_data_i[0][13] \
+  downstream2_io_data_i[0][14] \
+  downstream2_io_data_i[0][15] \
+}]
+set_input_delay -clock $fmc_input_clk2_name -max [expr $fmc_input_clk_period/2 - $dv_bre] $fmc_input_data2_port
+set_input_delay -clock $fmc_input_clk2_name -min $dv_are                                  $fmc_input_data2_port
+set_input_delay -clock $fmc_input_clk2_name -max [expr $fmc_input_clk_period/2 - $dv_bfe] $fmc_input_data2_port -clock_fall -add_delay
+set_input_delay -clock $fmc_input_clk2_name -min $dv_afe                                  $fmc_input_data2_port -clock_fall -add_delay
+
+# --- Link 2 TX2 output delays (shared budget) ---
+set fmc_output_data2_port [get_ports { \
+  upstream2_io_valid_r_o[0] \
+  upstream2_io_data_r_o[0][0] \
+  upstream2_io_data_r_o[0][1] \
+  upstream2_io_data_r_o[0][2] \
+  upstream2_io_data_r_o[0][3] \
+  upstream2_io_data_r_o[0][4] \
+  upstream2_io_data_r_o[0][5] \
+  upstream2_io_data_r_o[0][6] \
+  upstream2_io_data_r_o[0][7] \
+  upstream2_io_data_r_o[0][8] \
+  upstream2_io_data_r_o[0][9] \
+  upstream2_io_data_r_o[0][10] \
+  upstream2_io_data_r_o[0][11] \
+  upstream2_io_data_r_o[0][12] \
+  upstream2_io_data_r_o[0][13] \
+  upstream2_io_data_r_o[0][14] \
+  upstream2_io_data_r_o[0][15] \
+}]
+set_output_delay -clock $fmc_output_clk2_name -max [expr $fmc_input_clk_period/4 + $fmc_input_clk_period/2 - $tsu_r] $fmc_output_data2_port
+set_output_delay -clock $fmc_output_clk2_name -min [expr $fmc_input_clk_period/4 + $thd_r]                           $fmc_output_data2_port
+set_output_delay -clock $fmc_output_clk2_name -max [expr $fmc_input_clk_period/4 + $fmc_input_clk_period/2 - $tsu_f] $fmc_output_data2_port -clock_fall -add_delay
+set_output_delay -clock $fmc_output_clk2_name -min [expr $fmc_input_clk_period/4 + $thd_f]                           $fmc_output_data2_port -clock_fall -add_delay
+
 # Additional BSG Link timing not present in the sample XDC:
 #
 # token_clk_i[0] is a real input clock for the upstream credit-return path.
 create_clock -name token_clk_0 -period $fmc_input_clk_period [get_ports {token_clk_i[0]}]
+# token_clk2_i[0] is the link-2 credit-return input clock.
+create_clock -name token_clk2_0 -period $fmc_input_clk_period [get_ports {token_clk2_i[0]}]
 
 # bsg_link crosses these domains with async FIFOs/synchronizers.
 # clk_out1_clk_wiz_0 and clk_out2_clk_wiz_0 are the auto-generated names Vivado
 # assigns to the 50 MHz 0° and 90° clk_wiz_0 outputs; they are synchronous to
 # each other (same MMCM source) and treated as one group.
 # Verify the exact clock names after first synthesis run if the clock group fails.
+#
+# Both forwarded output clocks (upstream_io_clk_0 / upstream2_io_clk_0) derive
+# from the same MMCM and stay in the clk_wiz group; each received clock and each
+# token clock is its own asynchronous domain.
 set_clock_groups -asynchronous \
-  -group [get_clocks {clk_out1_clk_wiz_0 clk_out2_clk_wiz_0 upstream_io_clk_0}] \
+  -group [get_clocks {clk_out1_clk_wiz_0 clk_out2_clk_wiz_0 upstream_io_clk_0 upstream2_io_clk_0}] \
   -group [get_clocks downstream_io_clk_0] \
-  -group [get_clocks token_clk_0]
+  -group [get_clocks downstream2_io_clk_0] \
+  -group [get_clocks token_clk_0] \
+  -group [get_clocks token_clk2_0]

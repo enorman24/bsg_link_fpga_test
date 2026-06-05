@@ -86,7 +86,14 @@ set_property -dict [list \
   CONFIG.M02_AXI_PROTOCOL    {AXI4LITE} \
   CONFIG.M02_SEG00_BASE_ADDR {0x40020000} \
   CONFIG.M02_SEG00_HIGH_ADDR {0x4002FFFF} \
-  CONFIG.NUM_MI              {3} \
+  CONFIG.M03_SEG00_BASE_ADDR {0x40030000} \
+  CONFIG.M03_SEG00_HIGH_ADDR {0x4003FFFF} \
+  CONFIG.M04_SEG00_BASE_ADDR {0x40040000} \
+  CONFIG.M04_SEG00_HIGH_ADDR {0x4004FFFF} \
+  CONFIG.M05_AXI_PROTOCOL    {AXI4LITE} \
+  CONFIG.M05_SEG00_BASE_ADDR {0x40050000} \
+  CONFIG.M05_SEG00_HIGH_ADDR {0x4005FFFF} \
+  CONFIG.NUM_MI              {6} \
   CONFIG.NUM_SI              {1} \
   CONFIG.S00_AXI_ID_WIDTH    {1} \
   CONFIG.S00_SUPPORTS_NARROW {false} \
@@ -179,6 +186,78 @@ set_property -dict [list \
   CONFIG.C_PROBE0_WIDTH   {8} \
 ] [get_ips ila_rx_sta]
 generate_target all [get_ips ila_rx_sta]
+
+# ===== Link 2 ILAs (reverse-direction link; mirror the link-1 set) =====
+# ILA: AXI switch M03 ↔ TX2 FIFO
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_sw_tx2
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {6} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {12} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+  CONFIG.C_PROBE2_WIDTH   {32} \
+  CONFIG.C_PROBE3_WIDTH   {32} \
+  CONFIG.C_PROBE4_WIDTH   {32} \
+  CONFIG.C_PROBE5_WIDTH   {4} \
+] [get_ips ila_sw_tx2]
+generate_target all [get_ips ila_sw_tx2]
+
+# ILA: AXI switch M04 ↔ RX2 FIFO
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_sw_rx2
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {6} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {12} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+  CONFIG.C_PROBE2_WIDTH   {32} \
+  CONFIG.C_PROBE3_WIDTH   {32} \
+  CONFIG.C_PROBE4_WIDTH   {32} \
+  CONFIG.C_PROBE5_WIDTH   {4} \
+] [get_ips ila_sw_rx2]
+generate_target all [get_ips ila_sw_rx2]
+
+# ILA: AXI switch M05 ↔ RX2 status register map
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_sw_sta2
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {6} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {12} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+  CONFIG.C_PROBE2_WIDTH   {32} \
+  CONFIG.C_PROBE3_WIDTH   {32} \
+  CONFIG.C_PROBE4_WIDTH   {32} \
+  CONFIG.C_PROBE5_WIDTH   {4} \
+] [get_ips ila_sw_sta2]
+generate_target all [get_ips ila_sw_sta2]
+
+# ILA: TX2 FIFO ↔ BSG link TX2 core
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_tx_bsg2
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {2} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {2} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+] [get_ips ila_tx_bsg2]
+generate_target all [get_ips ila_tx_bsg2]
+
+# ILA: RX2 FIFO ↔ BSG link RX2 core
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_rx_bsg2
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {2} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {2} \
+  CONFIG.C_PROBE1_WIDTH   {32} \
+] [get_ips ila_rx_bsg2]
+generate_target all [get_ips ila_rx_bsg2]
+
+# ILA: RX2 FIFO status signals ↔ RX2 status register map
+create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name ila_rx_sta2
+set_property -dict [list \
+  CONFIG.C_NUM_OF_PROBES {1} \
+  CONFIG.C_DATA_DEPTH     {1024} \
+  CONFIG.C_PROBE0_WIDTH   {8} \
+] [get_ips ila_rx_sta2]
+generate_target all [get_ips ila_rx_sta2]
 
 create_ip -name vio -vendor xilinx.com -library ip -version 3.0 -module_name vio_0
 set_property -dict [list \

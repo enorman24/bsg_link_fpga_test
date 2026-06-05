@@ -20,8 +20,12 @@
 # Sample:
 # set_property INTERNAL_VREF 0.900 [get_iobanks 64]
 #
-# This design's SSTL18 BSG Link inputs are in HP banks 66 and 67.
-set_property INTERNAL_VREF 0.900 [get_iobanks {66 67}]
+# This design's SSTL18 BSG Link inputs are in HP banks 65, 66 and 67.
+#   banks 66/67: link-1 RX1 (downstream) + link-2 RX2 (downstream2) data/clk/valid inputs.
+#   bank 65    : the token INPUTS (token_clk_i = TX1, token_clk2_i = TX2) which are
+#                SSTL18_I and need a VREF in their bank. (Link 1 worked before this was
+#                added; adding bank 65 makes both tokens' VREF explicit/correct.)
+set_property INTERNAL_VREF 0.900 [get_iobanks {65 66 67}]
 
 # DCI Cascade
 # The 240 ohm resistor can be cascaded to other banks if needed
@@ -129,11 +133,17 @@ set_property PACKAGE_PIN L13  [get_ports {downstream_io_data_i[0][4]}]
 set_property PACKAGE_PIN P12  [get_ports {downstream_io_data_i[0][5]}]
 # data[6]/[9]/[10] moved to GPIO_0 positions D1/D11/D25 to mirror the upstream
 # re-pin above and keep the loopback ribbon straight-through (GPIO_1 Dn <-> GPIO_0 Dn).
+#   data[6]  -> AA6 = CLK0_M2C_N = GPIO_0 D1   (matches TX GPIO_1 D1)
+#   data[9]  -> AC8 = LA13_N     = GPIO_0 D11  (matches TX GPIO_1 D11)
+#   data[10] -> V1  = LA02_N     = GPIO_0 D25  (matches TX GPIO_1 D25)
+# NOTE: data[10] was wrongly on AC3 (= LA05_N = GPIO_0 D27) — a different ribbon
+# position than the TX's D25, which left the RX data[10] pin floating (read as
+# stuck-high lane 10). V1 = LA02_N is the correct GPIO_0 D25 pin.
 set_property PACKAGE_PIN AA6  [get_ports {downstream_io_data_i[0][6]}]
 set_property PACKAGE_PIN AA2  [get_ports {downstream_io_data_i[0][7]}]
-set_property PACKAGE_PIN V2  [get_ports {downstream_io_data_i[0][8]}]
+set_property PACKAGE_PIN V2   [get_ports {downstream_io_data_i[0][8]}]
 set_property PACKAGE_PIN AC8  [get_ports {downstream_io_data_i[0][9]}]
-set_property PACKAGE_PIN AC3  [get_ports {downstream_io_data_i[0][10]}]
+set_property PACKAGE_PIN V1   [get_ports {downstream_io_data_i[0][10]}]
 set_property PACKAGE_PIN AB5  [get_ports {downstream_io_data_i[0][11]}]
 set_property PACKAGE_PIN Y9  [get_ports {downstream_io_data_i[0][12]}]
 set_property PACKAGE_PIN N11   [get_ports {downstream_io_data_i[0][13]}]
@@ -208,3 +218,144 @@ resize_pblock       [get_pblocks pblock_link_tx] -add {CLOCKREGION_X3Y1:CLOCKREG
 # create_pblock                    pblock_link_rx
 # add_cells_to_pblock [get_pblocks pblock_link_rx] [get_cells -quiet [list link_rx_i]]
 # resize_pblock       [get_pblocks pblock_link_rx] -add {CLOCKREGION_X?Y?:CLOCKREGION_X?Y?}
+
+#==============================================================================
+# Link 2 (reverse-direction link) — physical interface on "Ribbon B".
+#
+# Board wiring (two F2G cards, cross-cabled):
+#   Ribbon A: HPC0/GPIO_0 <-> HPC1/GPIO_1   = link 1 (TX1 on HPC1/GPIO_1, RX1 on HPC0/GPIO_0)
+#   Ribbon B: HPC0/GPIO_1 <-> HPC1/GPIO_0   = link 2  (this block)
+#
+#   TX2 (upstream2)   = FMC_HPC1 / F2G GPIO_0  -> ALL in IO bank 65 / CLOCKREGION_X3Y1
+#                       (zero source-sync output spill, same single-region quality as TX1)
+#   RX2 (downstream2) = FMC_HPC0 / F2G GPIO_1  -> banks 66 (clk/valid/token/data[0..5]) + 67 (data[6..15])
+#                       input/capture side, multi-bank is harmless (mirrors RX1)
+#
+# Pins were derived authoritatively, NOT guessed:
+#   - F2G schematic fmc2gpio_rev_a1.pdf  : GPIO header index -> FMC connector pin
+#   - VITA 57.1                          : FMC connector pin -> P/N signal (disambiguates P/N)
+#   - ZCU102 board file part0_pins.xml   : FMC signal -> FPGA package pin (per HPC0/HPC1)
+#   - Vivado device DB (xczu9eg)         : pin -> BANK / CLOCK_REGION / IS_GLOBAL_CLK
+# STRAIGHT-THROUGH is guaranteed: for every bit, TX2 (GPIO_0) and RX2 (GPIO_1) use the SAME
+# GPIO index, so a straight ribbon (HPC1/GPIO_0 pin k <-> HPC0/GPIO_1 pin k) connects them.
+# The whole map was cross-checked against link-1's 19 proven anchors.
+# RX2 forwarded clock lands on GC pin Y4 (LA00_CC_P) -> no CLOCK_DEDICATED_ROUTE override needed.
+#==============================================================================
+
+# ---- TX2 output channel (upstream2 -> Ribbon B), FMC_HPC1 / GPIO_0, bank 65 ----
+set_property PACKAGE_PIN AJ6  [get_ports {upstream2_io_clk_r_o[0]}]
+set_property PACKAGE_PIN AJ5  [get_ports {upstream2_io_valid_r_o[0]}]
+set_property PACKAGE_PIN AE8  [get_ports {upstream2_io_data_r_o[0][0]}]
+set_property PACKAGE_PIN AF8  [get_ports {upstream2_io_data_r_o[0][1]}]
+set_property PACKAGE_PIN AD10 [get_ports {upstream2_io_data_r_o[0][2]}]
+set_property PACKAGE_PIN AE9  [get_ports {upstream2_io_data_r_o[0][3]}]
+set_property PACKAGE_PIN AG8  [get_ports {upstream2_io_data_r_o[0][4]}]
+set_property PACKAGE_PIN AH8  [get_ports {upstream2_io_data_r_o[0][5]}]
+set_property PACKAGE_PIN AE12 [get_ports {upstream2_io_data_r_o[0][6]}]
+set_property PACKAGE_PIN AF12 [get_ports {upstream2_io_data_r_o[0][7]}]
+set_property PACKAGE_PIN AD4  [get_ports {upstream2_io_data_r_o[0][8]}]
+set_property PACKAGE_PIN AE4  [get_ports {upstream2_io_data_r_o[0][9]}]
+set_property PACKAGE_PIN AF2  [get_ports {upstream2_io_data_r_o[0][10]}]
+set_property PACKAGE_PIN AF1  [get_ports {upstream2_io_data_r_o[0][11]}]
+set_property PACKAGE_PIN AD2  [get_ports {upstream2_io_data_r_o[0][12]}]
+set_property PACKAGE_PIN AD1  [get_ports {upstream2_io_data_r_o[0][13]}]
+set_property PACKAGE_PIN AG3  [get_ports {upstream2_io_data_r_o[0][14]}]
+set_property PACKAGE_PIN AH3  [get_ports {upstream2_io_data_r_o[0][15]}]
+
+# token_clk2_i is the TX2 credit-return INPUT. It is used as a CLOCK (clocks the
+# upstream async credit counter), so it MUST sit on a clock-capable (GCIO) pin or
+# the IO clock placer fails ('IO Clock Placer failed'). GPIO_0 index 0 = FMC
+# CLK0_M2C_P = AE7 is GCIO in bank 65 (mirrors link-1's token on AE5/LA00_CC_P).
+# SSTL18_I input -> needs VREF on bank 65 (already set).
+set_property PACKAGE_PIN AE7  [get_ports {token_clk2_i[0]}]
+
+set placement_bsg_up2_out_ports [get_ports { \
+  upstream2_io_clk_r_o[0] \
+  upstream2_io_valid_r_o[0] \
+  upstream2_io_data_r_o[0][0] \
+  upstream2_io_data_r_o[0][1] \
+  upstream2_io_data_r_o[0][2] \
+  upstream2_io_data_r_o[0][3] \
+  upstream2_io_data_r_o[0][4] \
+  upstream2_io_data_r_o[0][5] \
+  upstream2_io_data_r_o[0][6] \
+  upstream2_io_data_r_o[0][7] \
+  upstream2_io_data_r_o[0][8] \
+  upstream2_io_data_r_o[0][9] \
+  upstream2_io_data_r_o[0][10] \
+  upstream2_io_data_r_o[0][11] \
+  upstream2_io_data_r_o[0][12] \
+  upstream2_io_data_r_o[0][13] \
+  upstream2_io_data_r_o[0][14] \
+  upstream2_io_data_r_o[0][15] \
+}]
+set placement_bsg_token2_in_ports [get_ports {token_clk2_i[0]}]
+
+set_property IOSTANDARD        SSTL18_I   $placement_bsg_up2_out_ports;
+set_property SLEW              FAST       $placement_bsg_up2_out_ports;
+set_property OUTPUT_IMPEDANCE  RDRV_48_48 $placement_bsg_up2_out_ports;
+set_property ODT               RTT_48     $placement_bsg_token2_in_ports;
+set_property IOSTANDARD        SSTL18_I   $placement_bsg_token2_in_ports;
+
+# ---- RX2 input channel (Ribbon B -> downstream2), FMC_HPC0 / GPIO_1, banks 66/67 ----
+set_property PACKAGE_PIN Y4   [get_ports {downstream2_io_clk_i[0]}]
+set_property PACKAGE_PIN Y3   [get_ports {downstream2_io_valid_i[0]}]
+set_property PACKAGE_PIN V4   [get_ports {downstream2_io_data_i[0][0]}]
+set_property PACKAGE_PIN V3   [get_ports {downstream2_io_data_i[0][1]}]
+set_property PACKAGE_PIN Y2   [get_ports {downstream2_io_data_i[0][2]}]
+set_property PACKAGE_PIN Y1   [get_ports {downstream2_io_data_i[0][3]}]
+set_property PACKAGE_PIN AC2  [get_ports {downstream2_io_data_i[0][4]}]
+set_property PACKAGE_PIN AC1  [get_ports {downstream2_io_data_i[0][5]}]
+set_property PACKAGE_PIN N13  [get_ports {downstream2_io_data_i[0][6]}]
+set_property PACKAGE_PIN M13  [get_ports {downstream2_io_data_i[0][7]}]
+set_property PACKAGE_PIN N9   [get_ports {downstream2_io_data_i[0][8]}]
+set_property PACKAGE_PIN N8   [get_ports {downstream2_io_data_i[0][9]}]
+set_property PACKAGE_PIN M15  [get_ports {downstream2_io_data_i[0][10]}]
+set_property PACKAGE_PIN M14  [get_ports {downstream2_io_data_i[0][11]}]
+set_property PACKAGE_PIN M11  [get_ports {downstream2_io_data_i[0][12]}]
+set_property PACKAGE_PIN L11  [get_ports {downstream2_io_data_i[0][13]}]
+set_property PACKAGE_PIN M10  [get_ports {downstream2_io_data_i[0][14]}]
+set_property PACKAGE_PIN L10  [get_ports {downstream2_io_data_i[0][15]}]
+
+# downstream2_core_token_r_o is the RX2 credit-return OUTPUT. Straight-through
+# partner of token_clk2_i: GPIO index 0 on RX2's header (HPC0/GPIO_1) = LA12_P = W7
+# (bank 66). It is an OUTPUT, so it does not need a clock-capable pin.
+set_property PACKAGE_PIN W7   [get_ports {downstream2_core_token_r_o[0]}]
+
+set placement_bsg_down2_in_ports [get_ports { \
+  downstream2_io_clk_i[0] \
+  downstream2_io_valid_i[0] \
+  downstream2_io_data_i[0][0] \
+  downstream2_io_data_i[0][1] \
+  downstream2_io_data_i[0][2] \
+  downstream2_io_data_i[0][3] \
+  downstream2_io_data_i[0][4] \
+  downstream2_io_data_i[0][5] \
+  downstream2_io_data_i[0][6] \
+  downstream2_io_data_i[0][7] \
+  downstream2_io_data_i[0][8] \
+  downstream2_io_data_i[0][9] \
+  downstream2_io_data_i[0][10] \
+  downstream2_io_data_i[0][11] \
+  downstream2_io_data_i[0][12] \
+  downstream2_io_data_i[0][13] \
+  downstream2_io_data_i[0][14] \
+  downstream2_io_data_i[0][15] \
+}]
+set placement_bsg_token2_out_ports [get_ports {downstream2_core_token_r_o[0]}]
+
+set_property IOSTANDARD        SSTL18_I   $placement_bsg_down2_in_ports;
+set_property ODT               RTT_48     $placement_bsg_down2_in_ports;
+set_property SLEW              FAST       $placement_bsg_token2_out_ports;
+set_property OUTPUT_IMPEDANCE  RDRV_48_48 $placement_bsg_token2_out_ports;
+set_property IOSTANDARD        SSTL18_I   $placement_bsg_token2_out_ports;
+
+# Confine link_tx2_i (incl. its OSERDES) to bank 65 / CLOCKREGION_X3Y1 — the same
+# single region that holds all 18 TX2 outputs, so the forwarded-clock OSERDES sits
+# next to the data OSERDES (no data-vs-clock skew from a region crossing). This is
+# the link-2 twin of pblock_link_tx; both upstream engines share X3Y1 (bank 65).
+create_pblock                    pblock_link_tx2
+add_cells_to_pblock [get_pblocks pblock_link_tx2] [get_cells -quiet [list link_tx2_i]]
+resize_pblock       [get_pblocks pblock_link_tx2] -add {CLOCKREGION_X3Y1:CLOCKREGION_X3Y1}
+
+# Downstream2 (link_rx2_i) is input-side; left unconstrained like link_rx_i.

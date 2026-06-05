@@ -8,17 +8,23 @@
 #
 # Preconditions
 #   - Bitstream programmed (jtag_axi_0 present as a hw_axi).
-#   - PHYSICAL loopback in place: upstream_io_* cabled to downstream_io_*
-#     (F2G GPIO_1 on FMC_HPC1  <->  F2G GPIO_0 on FMC_HPC0, straight-through).
+#   - PHYSICAL loopback(s) in place, straight-through:
+#       Link 1: upstream_io_*  (F2G GPIO_1 on FMC_HPC1) <-> downstream_io_*  (F2G GPIO_0 on FMC_HPC0)
+#       Link 2: upstream2_io_* (F2G GPIO_0 on FMC_HPC1) <-> downstream2_io_* (F2G GPIO_1 on FMC_HPC0)
+#     (Only the link you intend to test needs its ribbon installed.)
 #   - The image powers up HELD IN RESET by vio_0 probe_out0 (init=1).
 #     bsg_link_open releases it.
 #
+# Two links share the one JTAG-AXI master; select which one the tests drive with
+# bsg_link_select 1|2 (default 1). Each link has its own FIFOs/status:
+#
 # Memory map (bsg_link_xbar_pkg / bsg_link_test_top)
-#   0x4000_0000  TX_DATA   WO  push one 32-bit flit into the upstream TX FIFO
-#   0x4001_0000  RX_DATA   RO  pop  one 32-bit flit from the downstream RX FIFO
-#   0x4002_0000  RX_STATUS RO  bit[1]=full  bit[0]=empty
-#   0x4002_0004  RX_COUNT  RO  flits currently in the RX FIFO (0..32)
-#   0x4002_0008  RX_CTRL   WO  bit[0]=flush  (NOTE: not wired in current RTL -> no-op;
+#   Link 1                                Link 2
+#   0x4000_0000  TX_DATA   WO             0x4003_0000  TX2_DATA   WO
+#   0x4001_0000  RX_DATA   RO             0x4004_0000  RX2_DATA   RO
+#   0x4002_0000  RX_STATUS RO  bit1=full  0x4005_0000  RX2_STATUS RO  bit0=empty
+#   0x4002_0004  RX_COUNT  RO  (0..32)    0x4005_0004  RX2_COUNT  RO
+#   0x4002_0008  RX_CTRL   WO  flush      0x4005_0008  RX2_CTRL   WO  (not wired -> no-op;
 #                              this library drains by reading, never relies on flush)
 #
 # Notes
@@ -38,14 +44,45 @@
 #=============================================================================
 
 # ---- configuration (override after sourcing if needed) ----
-set ::BSG_TX_DATA   0x40000000
-set ::BSG_RX_DATA   0x40010000
-set ::BSG_RX_STATUS 0x40020000
-set ::BSG_RX_COUNT  0x40020004
-set ::BSG_RX_CTRL   0x40020008
+# Per-link address maps. Link 1 = forward, Link 2 = reverse-direction link.
+array set ::BSG_LINK1 {
+  tx_data   0x40000000
+  rx_data   0x40010000
+  rx_status 0x40020000
+  rx_count  0x40020004
+  rx_ctrl   0x40020008
+}
+array set ::BSG_LINK2 {
+  tx_data   0x40030000
+  rx_data   0x40040000
+  rx_status 0x40050000
+  rx_count  0x40050004
+  rx_ctrl   0x40050008
+}
 set ::BSG_RX_DEPTH  32     ;# RX FIFO depth (LG_RX_FIFO_DEPTH_P = 5)
 set ::BSG_BATCH     16     ;# words per write/read chunk (< depth: no overflow/stall)
 set ::BSG_POLL_MAX  100    ;# RX_COUNT polls before declaring a word lost
+set ::BSG_LINK_SEL  0      ;# currently-selected link (set by bsg_link_select below)
+
+# Point the active address globals (::BSG_TX_DATA etc.) at link $n (1 or 2).
+# Every test proc operates on whichever link is currently selected.
+proc bsg_link_select {{n 1}} {
+  if {$n == 1} {
+    array set m [array get ::BSG_LINK1]
+  } elseif {$n == 2} {
+    array set m [array get ::BSG_LINK2]
+  } else {
+    error "bsg_link_select: link must be 1 or 2 (got $n)"
+  }
+  set ::BSG_TX_DATA   $m(tx_data)
+  set ::BSG_RX_DATA   $m(rx_data)
+  set ::BSG_RX_STATUS $m(rx_status)
+  set ::BSG_RX_COUNT  $m(rx_count)
+  set ::BSG_RX_CTRL   $m(rx_ctrl)
+  set ::BSG_LINK_SEL  $n
+  return $n
+}
+bsg_link_select 1   ;# default to link 1 (backward compatible)
 
 # ============================================================================
 # Low-level AXI access (single beat; unambiguous FIFO ordering)
@@ -91,6 +128,15 @@ proc bsg_wait_count {axi target} {
     if {$c >= $target} { return $c }
   }
   return [bsg_rx_count $axi]
+}
+
+# Poll an explicit RX_COUNT address until it reaches target (for testing a link
+# other than the currently-selected one, e.g. the concurrent both-links test).
+proc bsg_wait_count_at {axi count_addr target} {
+  for {set i 0} {$i < $::BSG_POLL_MAX} {incr i} {
+    if {[bsg_rd32 $axi $count_addr] >= $target} { return 1 }
+  }
+  return 0
 }
 
 # ============================================================================
@@ -247,13 +293,16 @@ proc bsg_link_release_reset {} {
 
 # Connect to the board, select the JTAG-AXI master, release reset.
 proc bsg_link_open {{device_index 0}} {
-  if {[catch {current_hw_target}]} {
-    open_hw_manager
-    connect_hw_server
-    open_hw_target
-  }
+  # Idempotent connect — works from a fresh batch session AND an already-open GUI
+  # Hardware Manager. (current_hw_target only warns when nothing is open, so it
+  # cannot be used as a catch-guard.)
+  catch {open_hw_manager}
+  if {[llength [get_hw_servers -quiet]] == 0} { connect_hw_server }
+  set tgts [get_hw_targets -quiet]
+  if {[llength $tgts] == 0} { error "no JTAG targets - board connected/powered, cable seated?" }
+  if {[catch {get_property NAME [current_hw_target]}]} { open_hw_target [lindex $tgts 0] }
   set devs [get_hw_devices -quiet]
-  if {[llength $devs] == 0} { error "no hw devices found - board connected / powered?" }
+  if {[llength $devs] == 0} { error "no hw devices found on the target" }
   current_hw_device [lindex $devs $device_index]
   refresh_hw_device -quiet [current_hw_device]
   bsg_link_release_reset
@@ -269,11 +318,12 @@ proc bsg_link_open {{device_index 0}} {
 # ============================================================================
 proc bsg_link_test_all {axi {volume 512}} {
   puts "=============================================="
-  puts "  bsg_link loopback integrity suite"
+  puts [format "  bsg_link loopback integrity suite (LINK %d)" $::BSG_LINK_SEL]
+  puts [format "  TX=%08X RX=%08X STATUS=%08X" $::BSG_TX_DATA $::BSG_RX_DATA $::BSG_RX_STATUS]
   puts "=============================================="
   if {![bsg_link_sanity $axi]} {
-    puts "ABORT: sanity/smoke failed - link not up. Fix before running patterns."
-    return 0
+    puts "WARNING: sanity/smoke failed - link may be down; running patterns anyway."
+    puts "         (pattern results below will show where/how it fails)"
   }
   set tt 0 ; set tf 0 ; set gmask 0
   foreach r [list \
@@ -298,6 +348,23 @@ proc bsg_link_test_all {axi {volume 512}} {
   return [expr {$tf == 0}]
 }
 
+# Run the full suite on a specific link (selects it first, then restores nothing —
+# the selection persists so follow-up individual tests hit the same link).
+proc bsg_link_test_link {axi n {volume 512}} {
+  bsg_link_select $n
+  return [bsg_link_test_all $axi $volume]
+}
+
+# Run the full suite on BOTH links in sequence. Requires both ribbons installed.
+proc bsg_link_test_both {axi {volume 512}} {
+  set ok1 [bsg_link_test_link $axi 1 $volume]
+  set ok2 [bsg_link_test_link $axi 2 $volume]
+  puts "=============================================="
+  puts [format "BOTH LINKS:  link1=%s  link2=%s" \
+        [expr {$ok1 ? "LINK OK" : "LINK FAILED"}] [expr {$ok2 ? "LINK OK" : "LINK FAILED"}]]
+  return [expr {$ok1 && $ok2}]
+}
+
 # Continuous soak: run the PRBS test forever (or 'iters' times), stop on first error.
 proc bsg_link_soak {axi {iters 0} {chunk 512}} {
   set i 0 ; set seed 0x12345678
@@ -315,4 +382,111 @@ proc bsg_link_soak {axi {iters 0} {chunk 512}} {
   return 1
 }
 
+# Round-robin soak over BOTH links (alternates link 1 / link 2 each iteration).
+# Stops on the first error on either link. Leaves link 1 selected when done.
+proc bsg_link_soak_both {axi {iters 0} {chunk 256}} {
+  set i 0 ; set s1 0x1111AAAA ; set s2 0x2222BBBB
+  while {$iters == 0 || $i < $iters} {
+    incr i
+    bsg_link_select 1 ; set s1 [bsg_xorshift32 $s1]
+    lassign [bsg_test_prbs $axi $chunk $s1] nt1 nf1 em1
+    bsg_link_select 2 ; set s2 [bsg_xorshift32 $s2]
+    lassign [bsg_test_prbs $axi $chunk $s2] nt2 nf2 em2
+    if {$nf1 != 0 || $nf2 != 0} {
+      puts [format "SOAK-BOTH STOPPED at iter %d: link1 errors=%d (%08X)  link2 errors=%d (%08X)" \
+            $i $nf1 $em1 $nf2 $em2]
+      bsg_link_select 1 ; return 0
+    }
+    if {$i % 10 == 0} { puts [format "  soak-both: %d iters x %d words/link clean" $i $chunk] }
+  }
+  puts [format "SOAK-BOTH OK: %d iters x %d words/link clean" $i $chunk]
+  bsg_link_select 1 ; return 1
+}
+
+# ============================================================================
+# Concurrent both-links test — drives link 1 and link 2 SIMULTANEOUSLY
+# (interleaved writes) and checks each link receives EXACTLY its own data.
+# This is the test that sequential bsg_link_test_both cannot do: it proves the
+# two links are independent (no cross-contamination through the shared AXI
+# crossbar / FIFOs) and exercises both datapaths under concurrent load.
+# Each link is given a distinct top-byte tag (link1=0x1A.., link2=0x2B..) so a
+# word leaking from one link's RX into the other's is detected directly.
+# n is capped to the RX FIFO depth so neither RX overflows.
+# ============================================================================
+proc bsg_link_test_concurrent {axi {n 32}} {
+  if {$n > $::BSG_RX_DEPTH} { set n $::BSG_RX_DEPTH }
+  set tx1  $::BSG_LINK1(tx_data) ; set rx1 $::BSG_LINK1(rx_data) ; set ct1 $::BSG_LINK1(rx_count)
+  set tx2  $::BSG_LINK2(tx_data) ; set rx2 $::BSG_LINK2(rx_data) ; set ct2 $::BSG_LINK2(rx_count)
+  puts "=============================================="
+  puts [format "  concurrent both-links test (%d words/link, interleaved)" $n]
+  puts "=============================================="
+
+  # Drain both RX FIFOs first.
+  foreach {rd ct} [list $rx1 $ct1 $rx2 $ct2] {
+    set g 0
+    while {[bsg_rd32 $axi $ct] > 0 && $g < [expr {$::BSG_RX_DEPTH + 8}]} { bsg_rd32 $axi $rd ; incr g }
+  }
+
+  # Build link-tagged patterns.
+  set exp1 {} ; set exp2 {}
+  for {set i 0} {$i < $n} {incr i} {
+    lappend exp1 [expr {(0x1A << 24) | ($i & 0xffffff)}]
+    lappend exp2 [expr {(0x2B << 24) | ($i & 0xffffff)}]
+  }
+
+  # Interleave writes: TX1[i], TX2[i], TX1[i+1], TX2[i+1], ... so both crossbar
+  # master paths are active back-to-back.
+  for {set i 0} {$i < $n} {incr i} {
+    bsg_wr32 $axi $tx1 [lindex $exp1 $i]
+    bsg_wr32 $axi $tx2 [lindex $exp2 $i]
+  }
+
+  # Wait for both RX FIFOs to collect n words.
+  bsg_wait_count_at $axi $ct1 $n
+  bsg_wait_count_at $axi $ct2 $n
+  set avail1 [bsg_rd32 $axi $ct1] ; set avail2 [bsg_rd32 $axi $ct2]
+
+  # Read both back.
+  set got1 {} ; for {set i 0} {$i < $avail1} {incr i} { lappend got1 [bsg_rd32 $axi $rx1] }
+  set got2 {} ; for {set i 0} {$i < $avail2} {incr i} { lappend got2 [bsg_rd32 $axi $rx2] }
+
+  # Verify each link == its own expected; detect cross-contamination by tag.
+  set fail 0 ; set cross 0
+  foreach {label exp got tag othertag} [list \
+        link1 $exp1 $got1 0x1A 0x2B \
+        link2 $exp2 $got2 0x2B 0x1A] {
+    set ne [llength $exp] ; set ng [llength $got]
+    if {$ng != $ne} {
+      puts [format "  \[%s\] COUNT mismatch: expected %d, got %d" $label $ne $ng]
+      incr fail [expr {abs($ne - $ng)}]
+    }
+    set lim [expr {$ng < $ne ? $ng : $ne}]
+    for {set i 0} {$i < $lim} {incr i} {
+      set e [lindex $exp $i] ; set a [lindex $got $i]
+      if {$a != $e} {
+        incr fail
+        set atag [expr {($a >> 24) & 0xff}]
+        set leaked [expr {$atag == $othertag ? "  <-- CROSS-CONTAMINATION (data from other link!)" : ""}]
+        if {$atag == $othertag} { incr cross }
+        if {$fail <= 8} {
+          puts [format "  \[%s\] idx %d: exp %08X got %08X%s" $label $i $e $a $leaked]
+        }
+      }
+    }
+  }
+
+  set ok [expr {$fail == 0}]
+  puts "----------------------------------------------"
+  puts [format "CONCURRENT  link1=%d/%d  link2=%d/%d  errors=%d  cross-link=%d  -> %s" \
+        $avail1 $n $avail2 $n $fail $cross \
+        [expr {$ok ? "BOTH LINKS OK (independent)" : "FAILED"}]]
+  if {$cross > 0} {
+    puts "  CROSS-CONTAMINATION detected: a link received the other link's data."
+    puts "  => crossbar address decode / FIFO routing bug (not a PHY/lane issue)."
+  }
+  return $ok
+}
+
 puts "bsg_link_integrity.tcl loaded. Start with:  set axi \[bsg_link_open\] ; bsg_link_test_all \$axi"
+puts "  Two links: bsg_link_select 1|2 (default 1), bsg_link_test_link \$axi 2, bsg_link_test_both \$axi"
+puts "  Concurrent (proves independence): bsg_link_test_concurrent \$axi ; soak both: bsg_link_soak_both \$axi"
