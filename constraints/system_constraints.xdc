@@ -24,8 +24,10 @@
 # set_property IOSTANDARD LVDS [get_ports {clk_in1_p clk_in1_n}]
 # create_clock -name clk_in1_p -period 3.333 [get_ports clk_in1_p]
 
-# # TODO: fill PACKAGE_PIN for rst_i once the ZCU102 button/GPIO pin is chosen.
-# set_property IOSTANDARD LVCMOS18 [get_ports rst_i]
+# rst_i was removed from the synthesized top (it is a simulation-only port now).
+# On hardware the design is reset by vio_0 (held at config) + MMCM lock, so there
+# is no rst_i pad and no constraint is needed. Do not re-add a [get_ports rst_i]
+# constraint here — it would error in synthesis.
 
 # #------------------------------------------------------------------------------
 # # 2. Temporary clock-route overrides

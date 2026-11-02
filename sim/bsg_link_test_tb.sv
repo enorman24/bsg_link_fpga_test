@@ -16,15 +16,28 @@ module bsg_link_test_tb ();
   localparam int N           = 8;    // words per test round
   localparam int POLL_MAX    = 500;  // max STATUS poll iterations before timeout
 
-  localparam int CORE_HALF = 4;  // core clock half-period (ps) → 8 ps period
+  // Core clock half-period (ps). 50000 -> 100 ns period (10 MHz).
+  // Deliberately slow: the hard input PHY (bsg_link_iddr_phy) uses a FIXED IDELAYE3
+  // of 192 taps (~6 ns at REFCLK=500 MHz). The forwarded clock is 90°-centered, so
+  // capture works only while that fixed delay stays well under a quarter period
+  // (T/4 = 25 ns here). The link is source-synchronous and frequency-independent, so
+  // a slow sim clock validates functionality with the real hard PHY in the loop.
+  localparam int CORE_HALF = 50000;
 
   // =========================================================================
   // Clock generation
   // io_master_clk is tied to core_clk (matches chip_top: wire io_master_clk = core_clk)
   // =========================================================================
-  logic core_clk = 1'b1;
+  logic core_clk   = 1'b1;
+  logic core_clk90 = 1'b1;   // 90°-lagging copy for the hard ODDR forwarded-clock PHY
 
   always #CORE_HALF core_clk = ~core_clk;
+  // core_clk90 lags core_clk by a quarter period (T/4 = CORE_HALF/2), emulating
+  // clk_wiz_0 clk_out2 (90°). Both upstream PHYs forward their link clock from this.
+  initial begin
+    #(CORE_HALF/2);
+    forever #CORE_HALF core_clk90 = ~core_clk90;
+  end
 
   // =========================================================================
   // DUT signals
@@ -50,11 +63,17 @@ module bsg_link_test_tb ();
   wire dn_io_rst_w     = rst  || (reset_cnt_r < 6'd32);  // downstream: 16 extra cycles for loopback
   wire core_rst_w      = rst  || (reset_cnt_r < 6'd48);  // core released last
 
-  // Ribbon-cable loopback wires
+  // Ribbon-cable loopback wires (link 1)
   logic [NUM_CH-1:0]              link_clk_w;
   logic [NUM_CH-1:0][CH_W-1:0]   link_data_w;
   logic [NUM_CH-1:0]              link_valid_w;
   logic [NUM_CH-1:0]              downstream_token_w;
+
+  // Ribbon-cable loopback wires (link 2, reverse-direction link)
+  logic [NUM_CH-1:0]              link2_clk_w;
+  logic [NUM_CH-1:0][CH_W-1:0]   link2_data_w;
+  logic [NUM_CH-1:0]              link2_valid_w;
+  logic [NUM_CH-1:0]              downstream2_token_w;
 
   // Simulation AXI master bus
   import bsg_link_xbar_pkg::*;
@@ -74,6 +93,7 @@ module bsg_link_test_tb ();
     .LG_RX_FIFO_DEPTH_P      (LG_RXDEP)
   ) dut (
     .core_clk_i                (core_clk),
+    .core_clk90_i              (core_clk90),
     .token_clk_i               (downstream_token_w),
 
     // DUT owns the bsg_link reset sequencer internally; drive raw reset here.
@@ -82,7 +102,7 @@ module bsg_link_test_tb ();
     // deasserts at cycle 36.
     .rst_i                     (rst),
 
-    // Ribbon-cable loopback: TX output → RX input
+    // Ribbon-cable loopback: TX output → RX input (link 1)
     .upstream_io_clk_r_o       (link_clk_w),
     .upstream_io_data_r_o      (link_data_w),
     .upstream_io_valid_r_o     (link_valid_w),
@@ -90,6 +110,16 @@ module bsg_link_test_tb ();
     .downstream_io_data_i      (link_data_w),
     .downstream_io_valid_i     (link_valid_w),
     .downstream_core_token_r_o (downstream_token_w),
+
+    // Ribbon-cable loopback: TX2 output → RX2 input (link 2)
+    .token_clk2_i               (downstream2_token_w),
+    .upstream2_io_clk_r_o       (link2_clk_w),
+    .upstream2_io_data_r_o      (link2_data_w),
+    .upstream2_io_valid_r_o     (link2_valid_w),
+    .downstream2_io_clk_i       (link2_clk_w),
+    .downstream2_io_data_i      (link2_data_w),
+    .downstream2_io_valid_i     (link2_valid_w),
+    .downstream2_core_token_r_o (downstream2_token_w),
 
     // Simulation AXI master
     .sim_req_i                 (sim_req),
@@ -190,12 +220,13 @@ module bsg_link_test_tb ();
     sim_req = '0;
   endtask
 
-  // Poll COUNT register (0x4002_0004) until it reaches min_count.
+  // Poll a COUNT register until it reaches min_count.
   // Errors out after POLL_MAX iterations so the simulation never hangs.
-  task automatic wait_for_count(input int min_count, output logic [31:0] count);
+  task automatic wait_for_count(input logic [31:0] count_addr, input int min_count,
+                                output logic [31:0] count);
     count = '0;
     for (int tries = 0; tries < POLL_MAX; tries++) begin
-      axi_read(32'h4002_0004, count);
+      axi_read(count_addr, count);
       if (count >= min_count) return;
       #(CORE_HALF * 4);  // 16 ps = 2 full core clock cycles between polls
     end
@@ -205,23 +236,31 @@ module bsg_link_test_tb ();
   endtask
 
   // Send N words, wait for them to loopback, read them back and verify.
+  // link: 0 = link 1 (0x4000_xxxx), 1 = link 2 (0x4003_xxxx).
   // tag is printed in pass/fail messages to distinguish rounds.
-  task automatic run_round(input string tag, input logic [31:0] pattern [N]);
+  task automatic run_round(input int link, input string tag, input logic [31:0] pattern [N]);
     logic [31:0] got [N];
     logic [31:0] cnt;
     int          fails;
+    logic [31:0] base, tx_addr, rx_addr, sta_addr, cnt_addr;
+
+    base     = 32'h4000_0000 + link * 32'h0003_0000;
+    tx_addr  = base;                    // TX_DATA
+    rx_addr  = base + 32'h0001_0000;    // RX_DATA
+    sta_addr = base + 32'h0002_0000;    // STATUS
+    cnt_addr = sta_addr + 32'h4;        // RX_COUNT
 
     $display("[%s] writing %0d words...", tag, N);
     for (int i = 0; i < N; i++)
-      axi_write(32'h4000_0000, pattern[i]);  // TX_DATA
+      axi_write(tx_addr, pattern[i]);
 
     $display("[%s] waiting for loopback...", tag);
-    wait_for_count(N, cnt);
+    wait_for_count(cnt_addr, N, cnt);
     $display("[%s] RX count = %0d", tag, cnt);
 
     $display("[%s] reading back...", tag);
     for (int i = 0; i < N; i++)
-      axi_read(32'h4001_0000, got[i]);   // RX_DATA
+      axi_read(rx_addr, got[i]);
 
     // Verify data matches
     fails = 0;
@@ -234,12 +273,12 @@ module bsg_link_test_tb ();
     end
 
     // RX FIFO should now be empty
-    axi_read(32'h4002_0004, cnt);  // RX_COUNT
+    axi_read(cnt_addr, cnt);
     if (cnt !== 0)
       $error("[%s] RX FIFO not empty after drain: count=%0d", tag, cnt);
 
     // STATUS register bit[0] = empty flag
-    axi_read(32'h4002_0000, cnt);  // STATUS
+    axi_read(sta_addr, cnt);
     if (cnt[0] !== 1'b1)
       $error("[%s] STATUS: empty flag not set after drain (STATUS=0x%08h)", tag, cnt);
 
@@ -286,18 +325,22 @@ module bsg_link_test_tb ();
     @(negedge core_rst_w);  // wait for the counter to finish all stages
 
     // -----------------------------------------------------------------------
-    // Two independent loopback rounds
+    // Two independent loopback rounds on each link (link 1 then link 2)
     // -----------------------------------------------------------------------
-    run_round("round-A", pattern_a);
-    run_round("round-B", pattern_b);
+    run_round(0, "link1-round-A", pattern_a);
+    run_round(0, "link1-round-B", pattern_b);
+    run_round(1, "link2-round-A", pattern_a);
+    run_round(1, "link2-round-B", pattern_b);
 
     $display("=== all rounds passed ===");
     $finish;
   end
 
-  // Safety timeout
+  // Safety timeout (scaled for the 100 ns sim clock; 2 ms >> the ~few-hundred-us test).
+  // Use a time-unit literal — a bare 20_000_000_000 ps literal overflows 32 bits and
+  // collapses to ~0, which would $finish the sim at time 0.
   initial begin
-    #10_000_000;
+    #2ms;
     $error("TIMEOUT — simulation did not finish in time.");
     $finish;
   end

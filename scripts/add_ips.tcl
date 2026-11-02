@@ -41,7 +41,14 @@ set_property -dict [list \
   CONFIG.M02_AXI_PROTOCOL    {AXI4LITE} \
   CONFIG.M02_SEG00_BASE_ADDR {0x40020000} \
   CONFIG.M02_SEG00_HIGH_ADDR {0x4002FFFF} \
-  CONFIG.NUM_MI              {3} \
+  CONFIG.M03_SEG00_BASE_ADDR {0x40030000} \
+  CONFIG.M03_SEG00_HIGH_ADDR {0x4003FFFF} \
+  CONFIG.M04_SEG00_BASE_ADDR {0x40040000} \
+  CONFIG.M04_SEG00_HIGH_ADDR {0x4004FFFF} \
+  CONFIG.M05_AXI_PROTOCOL    {AXI4LITE} \
+  CONFIG.M05_SEG00_BASE_ADDR {0x40050000} \
+  CONFIG.M05_SEG00_HIGH_ADDR {0x4005FFFF} \
+  CONFIG.NUM_MI              {6} \
   CONFIG.NUM_SI              {1} \
   CONFIG.S00_AXI_ID_WIDTH    {1} \
   CONFIG.S00_SUPPORTS_NARROW {false} \
@@ -59,6 +66,12 @@ foreach {mod_name num_probes probe0_w probe1_w probe2_w probe3_w probe4_w probe5
   ila_tx_bsg  2  2 32  0  0  0 0
   ila_rx_bsg  2  2 32  0  0  0 0
   ila_rx_sta  1  8  0  0  0  0 0
+  ila_sw_tx2  6 12 32 32 32 32 4
+  ila_sw_rx2  6 12 32 32 32 32 4
+  ila_sw_sta2 6 12 32 32 32 32 4
+  ila_tx_bsg2 2  2 32  0  0  0 0
+  ila_rx_bsg2 2  2 32  0  0  0 0
+  ila_rx_sta2 1  8  0  0  0  0 0
 } {
   if {[llength [get_ips -quiet $mod_name]] == 0} {
     create_ip -name ila -vendor xilinx.com -library ip -version 6.2 -module_name $mod_name
@@ -107,7 +120,7 @@ generate_target all [get_ips clk_wiz_0]
 
 update_compile_order -fileset sources_1
 
-puts "add_ips.tcl: required IP present: jtag_axi_0 axi_switch_0 clk_wiz_0 + 7 ILAs"
+puts "add_ips.tcl: required IP present: jtag_axi_0 axi_switch_0 clk_wiz_0 + 13 ILAs"
 
 if {$close_project_when_done} {
   close_project

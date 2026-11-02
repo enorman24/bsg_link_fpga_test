@@ -1,6 +1,9 @@
 // AXI4 types for the BSG link FPGA test.
-// Topology: 1 slave port (JTAG AXI master → S00), 3 master ports
-//           (TX FIFO → M00, RX FIFO → M01, RX Status → M02).
+// Topology: 1 slave port (JTAG AXI master → S00), 6 master ports.
+//   Link 1: TX1 FIFO → M00, RX1 FIFO → M01, RX1 Status → M02.
+//   Link 2: TX2 FIFO → M03, RX2 FIFO → M04, RX2 Status → M05.
+// (Link 2 is the independent reverse-direction bsg_link on the other F2G
+//  headers; same RTL/IP topology, separate address space.)
 // Bus widths: 32-bit address, 32-bit data, 1-bit ID, 1-bit user.
 //
 // Struct field order matches the PULP AXI4+ATOP typedef macros (typedef.svh)
@@ -17,7 +20,7 @@ package bsg_link_xbar_pkg;
 
   // ---- Crossbar topology ----
   localparam int unsigned NoSlvPorts = 1;   // one JTAG master  → S00
-  localparam int unsigned NoMstPorts = 3;   // TX FIFO, RX FIFO, RX Status
+  localparam int unsigned NoMstPorts = 6;   // per link: TX FIFO, RX FIFO, RX Status (x2 links)
 
   // ---- ID widths ----
   // jtag_axi_0 generates 1-bit IDs.  With a single slave port the crossbar
@@ -26,17 +29,30 @@ package bsg_link_xbar_pkg;
   localparam int unsigned MstIdWidth = 1;
 
   // ---- Master-port indices ----
-  localparam int unsigned IDX_TX_FIFO = 0;
-  localparam int unsigned IDX_RX_FIFO = 1;
-  localparam int unsigned IDX_RX_STA  = 2;
+  // Link 1
+  localparam int unsigned IDX_TX_FIFO  = 0;
+  localparam int unsigned IDX_RX_FIFO  = 1;
+  localparam int unsigned IDX_RX_STA   = 2;
+  // Link 2 (reverse-direction link)
+  localparam int unsigned IDX_TX2_FIFO = 3;
+  localparam int unsigned IDX_RX2_FIFO = 4;
+  localparam int unsigned IDX_RX2_STA  = 5;
 
   // ---- Address map (end_addr is exclusive, matching addr_decode convention) ----
-  localparam logic [AxiAddrWidth-1:0] TX_BASE  = 32'h4000_0000;
-  localparam logic [AxiAddrWidth-1:0] TX_END   = 32'h4001_0000;
-  localparam logic [AxiAddrWidth-1:0] RX_BASE  = 32'h4001_0000;
-  localparam logic [AxiAddrWidth-1:0] RX_END   = 32'h4002_0000;
-  localparam logic [AxiAddrWidth-1:0] STA_BASE = 32'h4002_0000;
-  localparam logic [AxiAddrWidth-1:0] STA_END  = 32'h4003_0000;
+  // Link 1
+  localparam logic [AxiAddrWidth-1:0] TX_BASE   = 32'h4000_0000;
+  localparam logic [AxiAddrWidth-1:0] TX_END    = 32'h4001_0000;
+  localparam logic [AxiAddrWidth-1:0] RX_BASE   = 32'h4001_0000;
+  localparam logic [AxiAddrWidth-1:0] RX_END    = 32'h4002_0000;
+  localparam logic [AxiAddrWidth-1:0] STA_BASE  = 32'h4002_0000;
+  localparam logic [AxiAddrWidth-1:0] STA_END   = 32'h4003_0000;
+  // Link 2
+  localparam logic [AxiAddrWidth-1:0] TX2_BASE  = 32'h4003_0000;
+  localparam logic [AxiAddrWidth-1:0] TX2_END   = 32'h4004_0000;
+  localparam logic [AxiAddrWidth-1:0] RX2_BASE  = 32'h4004_0000;
+  localparam logic [AxiAddrWidth-1:0] RX2_END   = 32'h4005_0000;
+  localparam logic [AxiAddrWidth-1:0] STA2_BASE = 32'h4005_0000;
+  localparam logic [AxiAddrWidth-1:0] STA2_END  = 32'h4006_0000;
 
   // ---- AXI response codes ----
   localparam logic [1:0] RESP_OKAY   = 2'b00;
